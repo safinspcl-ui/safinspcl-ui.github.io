@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Штатное расписание</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:20px 24px}
+
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+h1{font-size:1.35rem;font-weight:700;color:#fff}
+.status{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#718096}
+.dot{width:8px;height:8px;border-radius:50%;background:#48bb78;animation:pulse 2s infinite}
+.dot.err{background:#fc8181;animation:none}
+.dot.dirty{background:#ecc94b;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{background:#2d3748;border:1px solid #4a5568;color:#e2e8f0;padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer;transition:background .15s}
+.btn:hover{background:#4a5568}
+.btn.primary{background:#4c51bf;border-color:#667eea;color:#fff}
+.btn.primary:hover{background:#5a5fd0}
+.btn.danger{background:#742a2a;border-color:#9b2c2c;color:#fed7d7}
+.btn.danger:hover{background:#9b2c2c}
+.btn.sm{padding:3px 9px;font-size:.74rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.hint{font-size:.78rem;color:#718096;margin-bottom:16px;line-height:1.5;background:#1a202c;border:1px solid #2d3748;border-radius:10px;padding:12px 16px}
+code{background:#0f1117;border:1px solid #2d3748;border-radius:4px;padding:1px 5px;font-size:.82em;color:#cbd5e0}
+
+section{margin-bottom:24px}
+.section-title{font-size:.78rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+
+.panel{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 20px}
+
+/* направления */
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.chip{display:flex;align-items:center;gap:6px;background:#2d3748;border:1px solid #4a5568;border-radius:20px;padding:5px 6px 5px 12px;font-size:.82rem}
+.chip input{background:transparent;border:none;color:#e2e8f0;font-size:.82rem;width:90px}
+.chip input:focus{outline:none}
+.chip .x{cursor:pointer;color:#fc8181;border:none;background:none;font-size:.95rem;width:20px;height:20px;border-radius:50%;line-height:1}
+.chip .x:hover{background:#4a5568}
+.add-dir{display:flex;gap:8px}
+.add-dir input{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:7px 10px;border-radius:8px;font-size:.84rem;width:160px}
+
+/* отделы */
+.dept{margin-bottom:18px}
+.dept-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.dept-head input.dept-name{background:#0f1117;border:1px solid #2d3748;color:#fff;font-weight:700;font-size:1rem;padding:7px 10px;border-radius:8px;min-width:220px}
+.dept-stats{display:flex;gap:14px;font-size:.78rem;color:#a0aec0;margin-left:auto}
+.dept-stats b{color:#76e4f7}
+
+.table-wrap{background:#1a202c;border:1px solid #2d3748;border-radius:12px;overflow:hidden}
+.scroll-x{overflow-x:auto}
+table{border-collapse:collapse;font-size:.82rem;width:100%}
+th{background:#2d3748;color:#a0aec0;font-weight:600;text-align:left;padding:8px 10px;font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:6px 10px;border-top:1px solid #2d3748;white-space:nowrap;vertical-align:middle}
+tr:hover td{background:#212936}
+tr.total td{font-weight:700;border-top:2px solid #4a5568;color:#fff;background:#1f2733}
+.t-dim{color:#718096}
+.t-warn{color:#ecc94b}
+.t-red{color:#fc8181}
+.t-green{color:#68d391}
+.sub{font-size:.68rem;color:#718096;display:block;margin-top:1px}
+
+input[type=text],input[type=number]{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:5px 7px;border-radius:6px;font-size:.82rem}
+input:focus,select:focus{outline:none;border-color:#667eea}
+.w-name{width:150px}
+.w-pos{width:140px}
+.w-sm{width:55px}
+.w-md{width:75px}
+.w-pct{width:46px;text-align:right}
+select{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:5px 6px;border-radius:6px;font-size:.78rem}
+.cell-pair{display:flex;gap:3px;align-items:center}
+.cell-pair span{color:#4a5568;font-size:.72rem}
+.amt{font-size:.7rem;color:#76e4f7;display:block;text-align:right;margin-top:1px}
+.commission-row{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.commission-row label{display:flex;align-items:center;gap:4px;font-size:.74rem;color:#a0aec0;cursor:pointer}
+.del-btn{background:none;border:1px solid #4a5568;color:#fc8181;border-radius:6px;padding:2px 8px;font-size:.78rem;cursor:pointer}
+.del-btn:hover{background:#4a5568}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:18px}
+.card{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 18px}
+.card-label{font-size:.72rem;color:#718096;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.card-value{font-size:1.4rem;font-weight:700;color:#76e4f7}
+
+.add-dept{margin-bottom:20px}
+footer{font-size:.74rem;color:#4a5568;text-align:center;margin-top:30px;padding-bottom:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Штатное расписание</h1>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="lastUpdate">Загрузка…</span>
+    <button class="btn primary" onclick="saveNow()">Сохранить</button>
+  </div>
+</header>
+
+<div class="hint" id="setupHint" style="display:none">
+  Не настроен адрес Apps Script. Откройте <code>shtat-apps-script.gs</code>, разверните как веб-приложение
+  (см. инструкцию в начале файла) и впишите URL и токен в переменные <code>APPS_SCRIPT_URL</code> /
+  <code>APPS_SCRIPT_TOKEN</code> в начале <code>shtat.html</code>.
+</div>
+
+<section>
+  <div class="section-title">Направления бизнеса</div>
+  <div class="panel">
+    <div class="chips" id="dirChips"></div>
+    <div class="add-dir">
+      <input type="text" id="newDirName" placeholder="название направления">
+      <button class="btn" onclick="addDirection()">+ Добавить направление</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-title">Компания, итого</div>
+  <div class="cards" id="companyCards"></div>
+</section>
+
+<section id="deptsSection">
+  <div class="section-title">Отделы и сотрудники</div>
+  <div id="depts"></div>
+  <div class="add-dept">
+    <button class="btn" onclick="addDepartment()">+ Добавить отдел</button>
+  </div>
+</section>
+
+<section>
+  <div class="section-title">Итоги по отделам</div>
+  <div class="table-wrap scroll-x"><table id="deptTotals"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <div class="section-title">Итоги по направлениям</div>
+  <div class="table-wrap scroll-x"><table id="dirTotals"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<footer id="footer">Штатное расписание — Google Sheets через Apps Script</footer>
+
+<script>
+/* ══════════════════════════════════════
+   КОНФИГ — заполнить после деплоя Apps Script
+   (см. инструкцию в shtat-apps-script.gs)
+══════════════════════════════════════ */
+const APPS_SCRIPT_URL = ''; // напр. 'https://script.google.com/macros/s/AKfycb.../exec'
+const APPS_SCRIPT_TOKEN = ''; // тот же TOKEN, что и в Code.gs
+
+let uidCounter = 1;
+function uid() { return 'id' + (uidCounter++) + '_' + Math.random().toString(36).slice(2, 7); }
+
+// Стартовые данные перенесены из исходной Google-таблицы (распределение оклад/бонус — col "ratio" из таблицы)
+function emp(name, position, fte, oklad, bonus, okladRatio, bonusRatio, commission) {
+  const ratio = (r, idx) => { if (!r) return 0; const parts = r.split('/').map(Number); return parts[idx] || 0; };
+  const alloc = {
+    Etsy: { oklad: ratio(okladRatio, 0), bonus: ratio(bonusRatio, 0) },
+    'E-com': { oklad: ratio(okladRatio, 1), bonus: ratio(bonusRatio, 1) },
+    B2B: { oklad: 0, bonus: 0 },
+  };
+  return { id: uid(), name, position, fte, oklad, bonus,
+    commission: commission ? { enabled: true, type: 'amount', value: commission } : { enabled: false, type: 'amount', value: 0 },
+    alloc };
+}
+
+const DEFAULT_DATA = {
+  directions: ['Etsy', 'E-com', 'B2B'],
+  departments: [
+    { id: uid(), name: 'Управление компанией', employees: [
+      emp('Ярошенко Владимир', 'COO', 1, 3800, 0, '50/50', '50/50'),
+      emp('Петренко Ольга', 'проектный менеджер', 1, 1000, 160, '50/50', '0/100'),
+      emp('Татарова Ольга', 'ассистент CEO', 1, 1200, 0, '80/20', ''),
+    ]},
+    { id: uid(), name: 'Отдел производства', employees: [
+      emp('Бусыгина Алиса', 'начальник производства', 1, 1000, 0, '80/20', '90/10', 1680),
+      emp('Мельникова Катерина', 'дизайнер', 1, 1000, 200, '50/50', '80/20'),
+      emp('Шабаева Анна', 'помощник', 1, 800, 200, '80/20', ''),
+      emp('Годованюк Лолита', 'менеджер платформ', 1, 350, 550, '100/0', '100/0'),
+      emp('Энгельберг Лилия', 'логист', 1, 650, 150, '80/20', '80/20'),
+    ]},
+    { id: uid(), name: 'Отдел B2B продаж', employees: [
+      (() => { const e = emp('Либерчук Анастасия', 'B2B', 1, 2500, 200, '', ''); e.alloc.B2B = { oklad: 100, bonus: 100 }; return e; })(),
+    ]},
+    { id: uid(), name: 'Отдел продаж', employees: [
+      emp('Пензул Дмитрий', 'РОП', 1, 2500, 500, '80/20', ''),
+      emp('Коломоец Юлия', 'менеджер по продажам', 1, 450, 475, '80/20', '80/20', 675),
+      emp('Тихомирова Валентина', 'менеджер по продажам', 1, 450, 475, '80/20', '80/20', 675),
+      emp('Багно Игорь', 'менеджер по продажам', 1, 400, 350, '80/20', '', 600),
+      emp('Васильченко Дарья', 'менеджер по продажам', 1, 350, 275, '80/20', '80/20', 525),
+      emp('Мартиросян Карина', 'аккаунт-менеджер', 1, 600, 0, '80/20', ''),
+      emp('Кипяткова Ксения', 'аккаунт-менеджер', 1, 600, 0, '80/20', '80/20'),
+    ]},
+    { id: uid(), name: 'Управление финансами', employees: [
+      emp('Кудин Андрей', 'финансовый менеджер', 1, 1650, 0, '80/20', '80/20'),
+      emp('Минц Александр', 'аналитик', 1, 1200, 200, '50/50', '50/50'),
+    ]},
+    { id: uid(), name: 'Управление продвижением', employees: [
+      emp('Гладун Артем', 'CMO', 1, 3500, 0, '0/100', '10/90'),
+      emp('Гула Владислав', 'SEO', 1, 800, 200, '0/100', ''),
+      emp('Денисенко Сергей', 'IT-специалист', 1, 1600, 150, '40/60', '40/60'),
+    ]},
+    { id: uid(), name: 'Управление персоналом', employees: [
+      emp('Бондаренко Ирина', 'HR', 1, 1700, 0, '80/20', '80/20'),
+    ]},
+  ],
+};
+
+let state = DEFAULT_DATA;
+let dirty = false;
+let saveTimer = null;
+
+/* ══════════════════════════════════════
+   ИНИЦИАЛИЗАЦИЯ / ЗАГРУЗКА / СОХРАНЕНИЕ
+══════════════════════════════════════ */
+function init() {
+  if (!APPS_SCRIPT_URL) { document.getElementById('setupHint').style.display = 'block'; renderAll(); return; }
+  fetch(`${APPS_SCRIPT_URL}?action=load`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res.ok) throw new Error(res.error || 'ошибка загрузки');
+      if (res.data) state = normalizeState(res.data);
+      setStatus('ok', res.updatedAt ? 'Загружено: ' + fmtDate(res.updatedAt) : 'Загружено');
+      renderAll();
+    })
+    .catch(e => { setStatus('err', e.message); renderAll(); });
+}
+
+function normalizeState(data) {
+  const directions = Array.isArray(data.directions) && data.directions.length ? data.directions : ['Etsy', 'E-com', 'B2B'];
+  const departments = (data.departments || []).map(d => ({
+    id: d.id || uid(),
+    name: d.name || '',
+    employees: (d.employees || []).map(e => ({
+      id: e.id || uid(),
+      name: e.name || '',
+      position: e.position || '',
+      fte: numv(e.fte, 1),
+      oklad: numv(e.oklad, 0),
+      bonus: numv(e.bonus, 0),
+      commission: {
+        enabled: !!(e.commission && e.commission.enabled),
+        type: (e.commission && e.commission.type) || 'amount',
+        value: numv(e.commission && e.commission.value, 0),
+      },
+      alloc: e.alloc || {},
+    })),
+  }));
+  return { directions, departments };
+}
+
+function markDirty() {
+  dirty = true;
+  setStatus('dirty', 'Есть несохранённые изменения');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 2500);
+}
+
+function saveNow() {
+  if (!APPS_SCRIPT_URL) { setStatus('err', 'Apps Script не настроен'); return; }
+  clearTimeout(saveTimer);
+  setStatus('dirty', 'Сохранение…');
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'save', token: APPS_SCRIPT_TOKEN, data: state }),
+  }).then(r => r.json())
+    .then(res => {
+      if (!res.ok) throw new Error(res.error || 'ошибка сохранения');
+      dirty = false;
+      setStatus('ok', 'Сохранено: ' + fmtDate(res.updatedAt));
+    })
+    .catch(e => setStatus('err', 'Ошибка сохранения: ' + e.message));
+}
+
+function setStatus(kind, msg) {
+  const dot = document.getElementById('dot');
+  dot.className = 'dot' + (kind === 'ok' ? '' : kind === 'dirty' ? ' dirty' : ' err');
+  document.getElementById('lastUpdate').textContent = msg;
+}
+
+function fmtDate(d) {
+  try { return new Date(d).toLocaleString('ru'); } catch (e) { return String(d || ''); }
+}
+
+/* ══════════════════════════════════════
+   НАПРАВЛЕНИЯ
+══════════════════════════════════════ */
+function addDirection() {
+  const input = document.getElementById('newDirName');
+  const name = input.value.trim();
+  if (!name) return;
+  if (state.directions.includes(name)) { alert('Такое направление уже есть'); return; }
+  state.directions.push(name);
+  input.value = '';
+  markDirty();
+  renderAll();
+}
+
+function renameDirection(oldName, newName) {
+  newName = newName.trim();
+  if (!newName || newName === oldName) { renderAll(); return; }
+  if (state.directions.includes(newName)) { alert('Такое направление уже есть'); renderAll(); return; }
+  state.directions = state.directions.map(d => d === oldName ? newName : d);
+  state.departments.forEach(dep => dep.employees.forEach(e => {
+    if (e.alloc[oldName]) { e.alloc[newName] = e.alloc[oldName]; delete e.alloc[oldName]; }
+  }));
+  markDirty();
+  renderAll();
+}
+
+function deleteDirection(name) {
+  if (!confirm(`Удалить направление "${name}"? Распределение по нему будет потеряно.`)) return;
+  state.directions = state.directions.filter(d => d !== name);
+  state.departments.forEach(dep => dep.employees.forEach(e => { delete e.alloc[name]; }));
+  markDirty();
+  renderAll();
+}
+
+/* ══════════════════════════════════════
+   ОТДЕЛЫ / СОТРУДНИКИ
+══════════════════════════════════════ */
+function addDepartment() {
+  state.departments.push({ id: uid(), name: 'Новый отдел', employees: [] });
+  markDirty();
+  renderAll();
+}
+
+function deleteDepartment(deptId) {
+  const dep = state.departments.find(d => d.id === deptId);
+  if (!dep) return;
+  if (!confirm(`Удалить отдел "${dep.name}" со всеми сотрудниками?`)) return;
+  state.departments = state.departments.filter(d => d.id !== deptId);
+  markDirty();
+  renderAll();
+}
+
+function renameDepartment(deptId, name) {
+  const dep = state.departments.find(d => d.id === deptId);
+  if (dep) { dep.name = name; markDirty(); }
+  recalcAll();
+}
+
+function addEmployee(deptId) {
+  const dep = state.departments.find(d => d.id === deptId);
+  if (!dep) return;
+  const alloc = {};
+  state.directions.forEach(d => alloc[d] = { oklad: 0, bonus: 0 });
+  dep.employees.push({
+    id: uid(), name: '', position: '', fte: 1, oklad: 0, bonus: 0,
+    commission: { enabled: false, type: 'amount', value: 0 },
+    alloc,
+  });
+  markDirty();
+  renderAll();
+}
+
+function deleteEmployee(deptId, empId) {
+  const dep = state.departments.find(d => d.id === deptId);
+  if (!dep) return;
+  dep.employees = dep.employees.filter(e => e.id !== empId);
+  markDirty();
+  renderAll();
+}
+
+function findEmployee(deptId, empId) {
+  const dep = state.departments.find(d => d.id === deptId);
+  if (!dep) return null;
+  return dep.employees.find(e => e.id === empId) || null;
+}
+
+function setField(deptId, empId, field, value) {
+  const e = findEmployee(deptId, empId);
+  if (!e) return;
+  if (['fte', 'oklad', 'bonus'].includes(field)) e[field] = numv(value, 0);
+  else e[field] = value;
+  markDirty();
+  recalcAll();
+}
+
+function setCommission(deptId, empId, field, value) {
+  const e = findEmployee(deptId, empId);
+  if (!e) return;
+  if (field === 'enabled') e.commission.enabled = !!value;
+  else if (field === 'value') e.commission.value = numv(value, 0);
+  else e.commission.type = value;
+  markDirty();
+  if (field === 'enabled' || field === 'type') { renderAll(); } else { recalcAll(); }
+}
+
+function setAlloc(deptId, empId, dir, kind, value) {
+  const e = findEmployee(deptId, empId);
+  if (!e) return;
+  if (!e.alloc[dir]) e.alloc[dir] = { oklad: 0, bonus: 0 };
+  e.alloc[dir][kind] = numv(value, 0);
+  markDirty();
+  recalcAll();
+}
+
+/* ══════════════════════════════════════
+   РАСЧЁТЫ
+══════════════════════════════════════ */
+function empTotal(e) {
+  let total = e.oklad + e.bonus;
+  if (e.commission.enabled && e.commission.type === 'amount') total += e.commission.value;
+  return total;
+}
+
+function allocSum(e, kind) {
+  return state.directions.reduce((s, d) => s + ((e.alloc[d] && e.alloc[d][kind]) || 0), 0);
+}
+
+function deptTotals(dep) {
+  const t = { fte: 0, oklad: 0, bonus: 0, commission: 0, total: 0, byDir: {} };
+  state.directions.forEach(d => t.byDir[d] = { oklad: 0, bonus: 0 });
+  dep.employees.forEach(e => {
+    t.fte += e.fte; t.oklad += e.oklad; t.bonus += e.bonus;
+    if (e.commission.enabled && e.commission.type === 'amount') t.commission += e.commission.value;
+    t.total += empTotal(e);
+    state.directions.forEach(d => {
+      const a = e.alloc[d] || { oklad: 0, bonus: 0 };
+      t.byDir[d].oklad += e.oklad * (a.oklad || 0) / 100;
+      t.byDir[d].bonus += e.bonus * (a.bonus || 0) / 100;
+    });
+  });
+  return t;
+}
+
+function companyTotals() {
+  const t = { fte: 0, oklad: 0, bonus: 0, commission: 0, total: 0, byDir: {} };
+  state.directions.forEach(d => t.byDir[d] = { oklad: 0, bonus: 0 });
+  state.departments.forEach(dep => {
+    const dt = deptTotals(dep);
+    t.fte += dt.fte; t.oklad += dt.oklad; t.bonus += dt.bonus; t.commission += dt.commission; t.total += dt.total;
+    state.directions.forEach(d => { t.byDir[d].oklad += dt.byDir[d].oklad; t.byDir[d].bonus += dt.byDir[d].bonus; });
+  });
+  return t;
+}
+
+/* ══════════════════════════════════════
+   РЕНДЕР (полный) — при структурных изменениях
+══════════════════════════════════════ */
+function renderAll() {
+  renderDirChips();
+  renderDepartments();
+  recalcAll();
+}
+
+function renderDirChips() {
+  const wrap = document.getElementById('dirChips');
+  wrap.innerHTML = state.directions.map(d => `
+    <div class="chip">
+      <input type="text" value="${esc(d)}" onblur="renameDirection(${JSON.stringify(d)}, this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <button class="x" title="Удалить направление" onclick="deleteDirection(${JSON.stringify(d)})">×</button>
+    </div>`).join('') || '<span class="t-dim">Нет направлений</span>';
+}
+
+function renderDepartments() {
+  const wrap = document.getElementById('depts');
+  wrap.innerHTML = state.departments.map(dep => renderDept(dep)).join('') || '<div class="t-dim panel">Нет отделов. Добавьте отдел ниже.</div>';
+}
+
+function renderDept(dep) {
+  const dirHeaders = state.directions.map(d => `<th class="num" colspan="2">${esc(d)}</th>`).join('');
+  const dirSubHeaders = state.directions.map(() => `<th class="num">Окл %</th><th class="num">Бон %</th>`).join('');
+  const rows = dep.employees.map(e => renderEmpRow(dep.id, e)).join('') ||
+    `<tr><td colspan="${7 + state.directions.length * 2}" class="t-dim">Нет сотрудников в отделе</td></tr>`;
+
+  return `
+  <div class="dept" data-dept="${dep.id}">
+    <div class="dept-head">
+      <input type="text" class="dept-name" value="${esc(dep.name)}" onblur="renameDepartment('${dep.id}', this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <button class="btn sm" onclick="addEmployee('${dep.id}')">+ сотрудник</button>
+      <button class="btn sm danger" onclick="deleteDepartment('${dep.id}')">Удалить отдел</button>
+      <div class="dept-stats" id="dept-stats-${dep.id}"></div>
+    </div>
+    <div class="table-wrap scroll-x">
+      <table>
+        <thead>
+          <tr>
+            <th rowspan="2">ФИО</th><th rowspan="2">Должность</th><th rowspan="2" class="num">Ставки</th>
+            <th rowspan="2" class="num">Оклад</th><th rowspan="2" class="num">Бонус</th>
+            <th rowspan="2">% от заказа</th>
+            ${dirHeaders}
+            <th rowspan="2" class="num">Итого ЗП</th><th rowspan="2"></th>
+          </tr>
+          <tr>${dirSubHeaders}</tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderEmpRow(deptId, e) {
+  const dirCells = state.directions.map(d => {
+    const a = e.alloc[d] || { oklad: 0, bonus: 0 };
+    return `
+      <td class="num">
+        <input type="number" class="w-pct" value="${a.oklad || 0}" min="0" max="100"
+          oninput="setAlloc('${deptId}','${e.id}','${esc(d)}','oklad', this.value)">
+        <span class="amt" id="amt-${e.id}-${dirKey(d)}-oklad"></span>
+      </td>
+      <td class="num">
+        <input type="number" class="w-pct" value="${a.bonus || 0}" min="0" max="100"
+          oninput="setAlloc('${deptId}','${e.id}','${esc(d)}','bonus', this.value)">
+        <span class="amt" id="amt-${e.id}-${dirKey(d)}-bonus"></span>
+      </td>`;
+  }).join('');
+
+  return `
+  <tr data-emp="${e.id}">
+    <td><input type="text" class="w-name" value="${esc(e.name)}" oninput="setField('${deptId}','${e.id}','name', this.value)"></td>
+    <td><input type="text" class="w-pos" value="${esc(e.position)}" oninput="setField('${deptId}','${e.id}','position', this.value)"></td>
+    <td class="num"><input type="number" class="w-sm" step="0.1" value="${e.fte}" oninput="setField('${deptId}','${e.id}','fte', this.value)"></td>
+    <td class="num"><input type="number" class="w-md" value="${e.oklad}" oninput="setField('${deptId}','${e.id}','oklad', this.value)"></td>
+    <td class="num"><input type="number" class="w-md" value="${e.bonus}" oninput="setField('${deptId}','${e.id}','bonus', this.value)"></td>
+    <td>
+      <div class="commission-row">
+        <label><input type="checkbox" ${e.commission.enabled ? 'checked' : ''} onchange="setCommission('${deptId}','${e.id}','enabled', this.checked)"> получает % от заказа</label>
+        ${e.commission.enabled ? `
+        <div class="cell-pair">
+          <select onchange="setCommission('${deptId}','${e.id}','type', this.value)">
+            <option value="amount" ${e.commission.type === 'amount' ? 'selected' : ''}>Сумма $</option>
+            <option value="percent" ${e.commission.type === 'percent' ? 'selected' : ''}>% от заказа</option>
+          </select>
+          <input type="number" class="w-md" value="${e.commission.value}" oninput="setCommission('${deptId}','${e.id}','value', this.value)">
+        </div>` : ''}
+      </div>
+    </td>
+    ${dirCells}
+    <td class="num"><span id="tot-emp-${e.id}"></span></td>
+    <td><button class="del-btn" onclick="deleteEmployee('${deptId}','${e.id}')">×</button></td>
+  </tr>`;
+}
+
+function dirKey(d) { return d.replace(/[^a-zA-Z0-9]/g, '_'); }
+
+/* ══════════════════════════════════════
+   ПЕРЕСЧЁТ (без перестройки DOM) — на каждое изменение поля
+══════════════════════════════════════ */
+function recalcAll() {
+  state.departments.forEach(dep => {
+    dep.employees.forEach(e => {
+      const totEl = document.getElementById(`tot-emp-${e.id}`);
+      if (totEl) totEl.textContent = fmt(empTotal(e));
+      state.directions.forEach(d => {
+        const a = e.alloc[d] || { oklad: 0, bonus: 0 };
+        const okEl = document.getElementById(`amt-${e.id}-${dirKey(d)}-oklad`);
+        const bnEl = document.getElementById(`amt-${e.id}-${dirKey(d)}-bonus`);
+        if (okEl) okEl.textContent = '$' + fmt(e.oklad * (a.oklad || 0) / 100);
+        if (bnEl) bnEl.textContent = '$' + fmt(e.bonus * (a.bonus || 0) / 100);
+      });
+    });
+    const dt = deptTotals(dep);
+    const statsEl = document.getElementById(`dept-stats-${dep.id}`);
+    if (statsEl) statsEl.innerHTML =
+      `<span>Ставки: <b>${fmt(dt.fte)}</b></span><span>Оклад: <b>$${fmt(dt.oklad)}</b></span>` +
+      `<span>Бонус: <b>$${fmt(dt.bonus)}</b></span><span>Итого ЗП: <b>$${fmt(dt.total)}</b></span>`;
+  });
+
+  renderCompanyCards();
+  renderDeptTotalsTable();
+  renderDirTotalsTable();
+}
+
+function renderCompanyCards() {
+  const t = companyTotals();
+  const cards = document.getElementById('companyCards');
+  let html = `
+    <div class="card"><div class="card-label">Ставки</div><div class="card-value">${fmt(t.fte)}</div></div>
+    <div class="card"><div class="card-label">Оклад</div><div class="card-value">$${fmt(t.oklad)}</div></div>
+    <div class="card"><div class="card-label">Бонус</div><div class="card-value">$${fmt(t.bonus)}</div></div>
+    <div class="card"><div class="card-label">Комиссии (фикс. $)</div><div class="card-value">$${fmt(t.commission)}</div></div>
+    <div class="card"><div class="card-label">Итого ФОТ</div><div class="card-value">$${fmt(t.total)}</div></div>`;
+  cards.innerHTML = html;
+}
+
+function renderDeptTotalsTable() {
+  const table = document.getElementById('deptTotals');
+  const dirHeaders = state.directions.map(d => `<th class="num">${esc(d)} Оклад</th><th class="num">${esc(d)} Бонус</th>`).join('');
+  table.querySelector('thead').innerHTML = `<tr>
+    <th>Отдел</th><th class="num">Ставки</th><th class="num">Оклад</th><th class="num">Бонус</th>
+    <th class="num">Комиссии</th>${dirHeaders}<th class="num">Итого ЗП</th></tr>`;
+
+  const rows = state.departments.map(dep => {
+    const t = deptTotals(dep);
+    const dirCells = state.directions.map(d => `<td class="num">$${fmt(t.byDir[d].oklad)}</td><td class="num">$${fmt(t.byDir[d].bonus)}</td>`).join('');
+    return `<tr><td>${esc(dep.name)}</td><td class="num">${fmt(t.fte)}</td><td class="num">$${fmt(t.oklad)}</td>
+      <td class="num">$${fmt(t.bonus)}</td><td class="num">$${fmt(t.commission)}</td>${dirCells}<td class="num">$${fmt(t.total)}</td></tr>`;
+  }).join('');
+
+  const c = companyTotals();
+  const dirTotalCells = state.directions.map(d => `<td class="num">$${fmt(c.byDir[d].oklad)}</td><td class="num">$${fmt(c.byDir[d].bonus)}</td>`).join('');
+  const totalRow = `<tr class="total"><td>Компания, итого</td><td class="num">${fmt(c.fte)}</td><td class="num">$${fmt(c.oklad)}</td>
+    <td class="num">$${fmt(c.bonus)}</td><td class="num">$${fmt(c.commission)}</td>${dirTotalCells}<td class="num">$${fmt(c.total)}</td></tr>`;
+
+  table.querySelector('tbody').innerHTML = rows + totalRow || '<tr><td class="t-dim">Нет данных</td></tr>';
+}
+
+function renderDirTotalsTable() {
+  const table = document.getElementById('dirTotals');
+  table.querySelector('thead').innerHTML = `<tr><th>Направление</th><th class="num">Оклад, $</th><th class="num">Бонус, $</th><th class="num">Итого, $</th><th class="num">% от ФОТ по направлениям</th></tr>`;
+  const c = companyTotals();
+  const grandDir = state.directions.reduce((s, d) => s + c.byDir[d].oklad + c.byDir[d].bonus, 0);
+  const rows = state.directions.map(d => {
+    const sum = c.byDir[d].oklad + c.byDir[d].bonus;
+    const pct = grandDir ? (sum / grandDir * 100) : 0;
+    return `<tr><td>${esc(d)}</td><td class="num">$${fmt(c.byDir[d].oklad)}</td><td class="num">$${fmt(c.byDir[d].bonus)}</td>
+      <td class="num">$${fmt(sum)}</td><td class="num">${fmt(pct)}%</td></tr>`;
+  }).join('');
+  const totalRow = `<tr class="total"><td>Итого</td><td class="num">$${fmt(c.oklad)}</td><td class="num">$${fmt(c.bonus)}</td><td class="num">$${fmt(grandDir)}</td><td class="num">100%</td></tr>`;
+  table.querySelector('tbody').innerHTML = rows + totalRow || '<tr><td class="t-dim">Нет данных</td></tr>';
+}
+
+/* ══════════════════════════════════════
+   УТИЛИТЫ
+══════════════════════════════════════ */
+function numv(v, def) {
+  if (v === '' || v == null) return def;
+  const n = +String(v).replace(',', '.');
+  return isNaN(n) ? def : n;
+}
+function fmt(v) { return (v || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+window.addEventListener('beforeunload', e => { if (dirty) { saveNow(); } });
+
+init();
+</script>
+</body>
+</html>

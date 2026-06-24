@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Дашборд выручки</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:20px 24px}
+
+/* ── Header ── */
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+h1{font-size:1.35rem;font-weight:700;color:#fff}
+.status{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#718096}
+.dot{width:8px;height:8px;border-radius:50%;background:#48bb78;animation:pulse 2s infinite}
+.dot.err{background:#fc8181;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{background:#2d3748;border:1px solid #4a5568;color:#e2e8f0;padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer;transition:background .15s}
+.btn:hover{background:#4a5568}
+.btn.active{background:#4c51bf;border-color:#667eea;color:#fff}
+
+/* ── Controls ── */
+.controls{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 20px;margin-bottom:20px}
+.ctrl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ctrl-row+.ctrl-row{margin-top:12px}
+.ctrl-label{font-size:.78rem;color:#718096;white-space:nowrap;min-width:70px}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+input[type=date]{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:7px 10px;border-radius:8px;font-size:.84rem;cursor:pointer}
+input[type=date]:focus{outline:none;border-color:#667eea}
+.group-tabs{display:flex;gap:4px}
+.sep{width:1px;background:#2d3748;align-self:stretch;margin:0 4px}
+.compare-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.85rem;color:#a0aec0}
+.compare-toggle input{width:16px;height:16px;cursor:pointer;accent-color:#667eea}
+.compare-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+
+/* ── KPI cards ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.card{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:18px 20px}
+.card-label{font-size:.72rem;color:#718096;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.card-value{font-size:1.75rem;font-weight:700}
+.card-value.green{color:#68d391}
+.card-value.blue{color:#76e4f7}
+.card-value.purple{color:#b794f4}
+.card-delta{font-size:.78rem;margin-top:4px}
+.card-delta.up{color:#68d391}
+.card-delta.down{color:#fc8181}
+.card-sub{font-size:.75rem;color:#718096;margin-top:3px}
+
+/* ── Chart ── */
+.chart-wrap{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 20px;margin-bottom:20px}
+.chart-title{font-size:.82rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px}
+.chart-canvas-wrap{position:relative;height:240px}
+
+/* ── Breakdown grid ── */
+.breakdown-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:20px}
+.breakdown{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 20px}
+.breakdown-title{font-size:.78rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid #2d3748;font-size:.85rem}
+.breakdown-row:first-of-type{border-top:none}
+.bd-name{color:#cbd5e0;max-width:60%}
+.bd-vals{text-align:right;font-variant-numeric:tabular-nums}
+.bd-total{font-weight:600;color:#68d391}
+.bd-adv{font-size:.76rem;color:#76e4f7}
+.bd-sur{font-size:.76rem;color:#b794f4}
+.bd-bar-wrap{height:3px;background:#2d3748;border-radius:2px;margin-top:4px}
+.bd-bar{height:3px;background:#667eea;border-radius:2px;transition:width .4s}
+
+/* ── Timeline table ── */
+.table-wrap{background:#1a202c;border:1px solid #2d3748;border-radius:12px;overflow:hidden;margin-bottom:20px}
+.table-title{font-size:.78rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.06em;padding:14px 18px 0}
+table{width:100%;border-collapse:collapse;font-size:.84rem}
+th{background:#2d3748;color:#a0aec0;font-weight:600;text-align:left;padding:10px 16px;font-size:.75rem;text-transform:uppercase;letter-spacing:.05em}
+th:not(:first-child){text-align:right}
+td{padding:9px 16px;border-top:1px solid #2d3748}
+td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
+tr:hover td{background:#2d3748}
+.t-total{color:#68d391;font-weight:600}
+.t-adv{color:#76e4f7}
+.t-sur{color:#b794f4}
+.t-cnt{color:#718096;font-size:.78rem}
+.t-delta-up{color:#68d391;font-size:.78rem}
+.t-delta-dn{color:#fc8181;font-size:.78rem}
+
+.empty{text-align:center;color:#718096;padding:40px;font-size:.88rem}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Дашборд выручки</h1>
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <span id="lastUpdate">Загрузка…</span>
+    <button class="btn" onclick="loadData()">↻ Обновить</button>
+  </div>
+</header>
+
+<!-- Controls -->
+<div class="controls">
+  <!-- Row 1: date range + presets + grouping -->
+  <div class="ctrl-row">
+    <span class="ctrl-label">Период:</span>
+    <input type="date" id="dateFrom" value="2026-06-01" onchange="render()">
+    <span style="color:#718096">—</span>
+    <input type="date" id="dateTo" onchange="render()">
+    <div class="presets">
+      <button class="btn" onclick="setPreset('today')">Сегодня</button>
+      <button class="btn" onclick="setPreset('week')">Эта неделя</button>
+      <button class="btn" onclick="setPreset('prevweek')">Прош. неделя</button>
+      <button class="btn" onclick="setPreset('month')">Этот месяц</button>
+      <button class="btn" onclick="setPreset('all')">Всё время</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group-tabs">
+      <button class="btn active" id="grp-day"   onclick="setGroup('day')">День</button>
+      <button class="btn"        id="grp-week"  onclick="setGroup('week')">Неделя</button>
+      <button class="btn"        id="grp-month" onclick="setGroup('month')">Месяц</button>
+    </div>
+  </div>
+  <!-- Row 2: comparison -->
+  <div class="ctrl-row">
+    <label class="compare-toggle">
+      <input type="checkbox" id="cmpToggle" onchange="toggleCompare()">
+      Сравнить с периодом:
+    </label>
+    <div id="cmpInputs" style="display:none;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="cmpFrom" onchange="render()">
+      <span style="color:#718096">—</span>
+      <input type="date" id="cmpTo" onchange="render()">
+    </div>
+  </div>
+</div>
+
+<div id="root"></div>
+
+<script>
+const SHEET_ID = '1um5NGkyXPJCOF6b_h8rHNkIoaK3gCnUWlo-knO_2_dA';
+const MIN_DATE = '2026-06-01';
+const REFRESH_MS = 30000;
+
+let allData = [];   // { advDate, advance, surDate, surcharge, shop, paySource, surSource, channel }
+let grouping = 'day';
+let chartInst = null;
+
+/* ══════════════════════════════════════
+   DATA LOADING
+══════════════════════════════════════ */
+function loadData() {
+  const old = document.getElementById('_gviz');
+  if (old) old.remove();
+  window._gvizCB = function(raw) {
+    try { parseGviz(raw); setStatus(true); }
+    catch(e) { setStatus(false, e.message); }
+  };
+  const s = document.createElement('script');
+  s.id = '_gviz';
+  s.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:_gvizCB&gid=0&_=` + Date.now();
+  s.onerror = () => setStatus(false, 'Нет доступа к таблице');
+  document.head.appendChild(s);
+}
+
+function setStatus(ok, msg) {
+  document.getElementById('dot').className = 'dot' + (ok ? '' : ' err');
+  document.getElementById('lastUpdate').textContent = ok
+    ? 'Обновлено: ' + new Date().toLocaleTimeString('ru')
+    : 'Ошибка: ' + msg;
+}
+
+function parseGviz(json) {
+  allData = [];
+  for (const row of json.table.rows) {
+    const c = row.c || [];
+    const v = i => c[i] != null ? c[i].v : null;
+    const advDate = parseGvizDate(v(3));
+    const surDate = parseGvizDate(v(9));
+    const advAmt  = +v(5) || 0;
+    const surAmt  = +v(7) || 0;
+    if (!advDate && !surDate) continue;
+    // apply hard floor: exclude dates before MIN_DATE
+    const effAdv = advDate && advDate >= MIN_DATE ? advDate : null;
+    const effSur = surDate && surDate >= MIN_DATE ? surDate : null;
+    if (!effAdv && !effSur) continue;
+    allData.push({
+      advDate: effAdv, advance: effAdv ? advAmt : 0,
+      surDate: effSur, surcharge: effSur ? surAmt : 0,
+      shop:      String(v(1) || ''),
+      paySource: String(v(2) || ''),
+      surSource: String(v(8) || ''),
+      channel:   String(v(11) || ''),
+    });
+  }
+  render();
+}
+
+function parseGvizDate(v) {
+  if (!v) return null;
+  const m = String(v).match(/Date\((\d+),(\d+),(\d+)\)/);
+  if (m) return `${m[1]}-${String(+m[2]+1).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  return null;
+}
+
+/* ══════════════════════════════════════
+   CONTROLS
+══════════════════════════════════════ */
+function today() { return new Date().toISOString().slice(0,10); }
+
+function setPreset(p) {
+  const now = new Date();
+  let from, to = today();
+  if (p === 'today') { from = to; }
+  else if (p === 'week') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - ((d.getDay()+6)%7));
+    from = d.toISOString().slice(0,10);
+  } else if (p === 'prevweek') {
+    const d = new Date(now);
+    d.setDate(d.getDate() - ((d.getDay()+6)%7) - 7);
+    from = d.toISOString().slice(0,10);
+    const e = new Date(d); e.setDate(e.getDate()+6);
+    to = e.toISOString().slice(0,10);
+  } else if (p === 'month') {
+    from = now.toISOString().slice(0,8) + '01';
+  } else {
+    from = MIN_DATE;
+  }
+  if (from < MIN_DATE) from = MIN_DATE;
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value   = to;
+  render();
+}
+
+function setGroup(g) {
+  grouping = g;
+  ['day','week','month'].forEach(x => {
+    document.getElementById('grp-'+x).classList.toggle('active', x===g);
+  });
+  render();
+}
+
+function toggleCompare() {
+  const on = document.getElementById('cmpToggle').checked;
+  document.getElementById('cmpInputs').style.display = on ? 'flex' : 'none';
+  render();
+}
+
+function getRange() {
+  const from = document.getElementById('dateFrom').value || MIN_DATE;
+  const to   = document.getElementById('dateTo').value   || today();
+  return { from: from < MIN_DATE ? MIN_DATE : from, to };
+}
+function getCmpRange() {
+  if (!document.getElementById('cmpToggle').checked) return null;
+  const from = document.getElementById('cmpFrom').value;
+  const to   = document.getElementById('cmpTo').value;
+  if (!from || !to) return null;
+  return { from: from < MIN_DATE ? MIN_DATE : from, to };
+}
+
+/* ══════════════════════════════════════
+   AGGREGATION
+══════════════════════════════════════ */
+function filterRows(from, to) {
+  // returns rows where at least one payment falls in range
+  return allData.map(r => {
+    const advOk = r.advDate && r.advDate >= from && r.advDate <= to;
+    const surOk = r.surDate && r.surDate >= from && r.surDate <= to;
+    if (!advOk && !surOk) return null;
+    return {
+      ...r,
+      advance:   advOk ? r.advance   : 0,
+      surcharge: surOk ? r.surcharge : 0,
+    };
+  }).filter(Boolean);
+}
+
+function sumRows(rows) {
+  return rows.reduce((a,r) => ({
+    total:     a.total     + r.advance + r.surcharge,
+    advances:  a.advances  + r.advance,
+    surcharges:a.surcharges+ r.surcharge,
+    advCnt:    a.advCnt    + (r.advance>0?1:0),
+    surCnt:    a.surCnt    + (r.surcharge>0?1:0),
+    count:     a.count     + (r.advance>0?1:0) + (r.surcharge>0?1:0),
+  }), { total:0, advances:0, surcharges:0, advCnt:0, surCnt:0, count:0 });
+}
+
+/* ── Time key ── */
+function timeKey(dateStr, grp) {
+  if (!dateStr) return null;
+  if (grp === 'month') return dateStr.slice(0,7);
+  if (grp === 'week') {
+    const d = new Date(dateStr);
+    const day = (d.getDay()+6)%7;
+    const mon = new Date(d); mon.setDate(d.getDate()-day);
+    return mon.toISOString().slice(0,10);
+  }
+  return dateStr;
+}
+
+function formatKey(k, grp) {
+  if (grp === 'month') {
+    const [y,m] = k.split('-');
+    const names = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    return names[+m-1]+' '+y;
+  }
+  if (grp === 'week') {
+    const end = new Date(k); end.setDate(end.getDate()+6);
+    return fmtD(k)+' – '+fmtD(end.toISOString().slice(0,10));
+  }
+  return fmtD(k);
+}
+
+function fmtD(s) {
+  if (!s) return '';
+  const [y,m,d] = s.split('-');
+  return d+'.'+m+'.'+y.slice(2);
+}
+
+function buildTimeSeries(rows, from, to, grp) {
+  // generate all keys in range
+  const keys = [];
+  const cur = new Date(from);
+  const end = new Date(to);
+  while (cur <= end) {
+    const k = timeKey(cur.toISOString().slice(0,10), grp);
+    if (!keys.includes(k)) keys.push(k);
+    if (grp === 'month') cur.setMonth(cur.getMonth()+1);
+    else if (grp === 'week') cur.setDate(cur.getDate()+7);
+    else cur.setDate(cur.getDate()+1);
+  }
+
+  const map = {};
+  for (const r of rows) {
+    if (r.advance > 0) {
+      const k = timeKey(r.advDate, grp);
+      if (k) { if (!map[k]) map[k]={adv:0,sur:0,advCnt:0,surCnt:0}; map[k].adv+=r.advance; map[k].advCnt++; }
+    }
+    if (r.surcharge > 0) {
+      const k = timeKey(r.surDate, grp);
+      if (k) { if (!map[k]) map[k]={adv:0,sur:0,advCnt:0,surCnt:0}; map[k].sur+=r.surcharge; map[k].surCnt++; }
+    }
+  }
+  return keys.map(k => ({ key:k, label:formatKey(k,grp), adv:map[k]?.adv||0, sur:map[k]?.sur||0, advCnt:map[k]?.advCnt||0, surCnt:map[k]?.surCnt||0 }));
+}
+
+/* ── Breakdown helpers ── */
+function breakdownBy(rows, keyFn) {
+  const map = {};
+  for (const r of rows) {
+    const key = keyFn(r);
+    if (!map[key]) map[key] = {adv:0,sur:0,advCnt:0,surCnt:0};
+    map[key].adv += r.advance;
+    map[key].sur += r.surcharge;
+    if (r.advance   > 0) map[key].advCnt++;
+    if (r.surcharge > 0) map[key].surCnt++;
+  }
+  return Object.entries(map)
+    .map(([name,v]) => ({ name, adv:v.adv, sur:v.sur, total:v.adv+v.sur, advCnt:v.advCnt, surCnt:v.surCnt }))
+    .sort((a,b) => b.total-a.total);
+}
+
+function normSource(s) {
+  if (!s) return '—';
+  const low = s.toLowerCase();
+  if (low.includes('paypal')) return 'Сайт (PayPal)';
+  if (low.includes('stripe')) return 'Сайт (Stripe)';
+  if (low.startsWith('сайт') || low.startsWith('site')) return 'Сайт (другое)';
+  return s;
+}
+
+/* ══════════════════════════════════════
+   RENDER
+══════════════════════════════════════ */
+const fmt = v => '$' + v.toLocaleString('ru',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtN = v => v.toLocaleString('ru',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function render() {
+  const { from, to } = getRange();
+  const cmp = getCmpRange();
+  const rows  = filterRows(from, to);
+  const crows = cmp ? filterRows(cmp.from, cmp.to) : null;
+
+  const stats  = sumRows(rows);
+  const cstats = crows ? sumRows(crows) : null;
+
+  const series  = buildTimeSeries(rows, from, to, grouping);
+  const cseries = (crows && cmp) ? buildTimeSeries(crows, cmp.from, cmp.to, grouping) : null;
+
+  // shop breakdown
+  const byShop   = breakdownBy(rows, r => r.shop || '—');
+  // payment source breakdown (C for advance, I for surcharge)
+  const srcMap = {};
+  for (const r of rows) {
+    if (r.advance > 0) {
+      const k = normSource(r.paySource);
+      if (!srcMap[k]) srcMap[k]={adv:0,sur:0,advCnt:0,surCnt:0};
+      srcMap[k].adv += r.advance;
+      srcMap[k].advCnt++;
+    }
+    if (r.surcharge > 0) {
+      const k = normSource(r.surSource);
+      if (!srcMap[k]) srcMap[k]={adv:0,sur:0,advCnt:0,surCnt:0};
+      srcMap[k].sur += r.surcharge;
+      srcMap[k].surCnt++;
+    }
+  }
+  // "Сайт (итого)" virtual row
+  let siteAdv=0, siteSur=0, siteAdvCnt=0, siteSurCnt=0;
+  for (const [k,v] of Object.entries(srcMap)) {
+    if (k.startsWith('Сайт')) { siteAdv+=v.adv; siteSur+=v.sur; siteAdvCnt+=v.advCnt; siteSurCnt+=v.surCnt; }
+  }
+  const bySrc = Object.entries(srcMap)
+    .map(([name,v]) => ({ name, adv:v.adv, sur:v.sur, total:v.adv+v.sur, advCnt:v.advCnt, surCnt:v.surCnt }))
+    .sort((a,b) => b.total-a.total);
+  if (siteAdv+siteSur > 0) {
+    bySrc.push({ name:'Сайт (итого)', adv:siteAdv, sur:siteSur, total:siteAdv+siteSur, advCnt:siteAdvCnt, surCnt:siteSurCnt, isSummary:true });
+  }
+
+  // channel breakdown (L)
+  const byChan = breakdownBy(rows, r => r.channel || '—');
+
+  document.getElementById('root').innerHTML = `
+    ${renderCards(stats, cstats, from, to, cmp)}
+    ${renderChart(series, cseries)}
+    ${renderBreakdowns(byShop, bySrc, byChan)}
+    ${renderTable(series, cseries)}
+  `;
+
+  drawChart(series, cseries, from, to, cmp);
+}
+
+/* ── Cards ── */
+function delta(a, b) {
+  if (!b || b.total === 0) return '';
+  const pct = ((a.total - b.total) / b.total * 100);
+  const cls = pct >= 0 ? 'up' : 'down';
+  return `<div class="card-delta ${cls}">${pct>=0?'▲':'▼'} ${Math.abs(pct).toFixed(1)}% vs пред. периода</div>`;
+}
+
+function renderCards(s, c, from, to, cmp) {
+  const period = cmp
+    ? `<div class="card-sub">${fmtD(from)}–${fmtD(to)}</div>`
+    : `<div class="card-sub">${s.count} транзакций</div>`;
+  const cprd = cmp ? `<div class="card-sub">${fmtD(cmp.from)}–${fmtD(cmp.to)}: ${fmt(c?.total||0)}</div>` : '';
+  return `<div class="cards">
+    <div class="card">
+      <div class="card-label">Итого выручка</div>
+      <div class="card-value green">${fmt(s.total)}</div>
+      ${delta(s,c)}${period}${cprd}
+    </div>
+    <div class="card">
+      <div class="card-label">Авансы</div>
+      <div class="card-value blue">${fmt(s.advances)}</div>
+      ${c?`<div class="card-sub">пред: ${fmt(c.advances)}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="card-label">Доплаты</div>
+      <div class="card-value purple">${fmt(s.surcharges)}</div>
+      ${c?`<div class="card-sub">пред: ${fmt(c.surcharges)}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="card-label">Авансов (кол-во)</div>
+      <div class="card-value" style="color:#76e4f7">${s.advCnt}</div>
+      ${c?`<div class="card-sub">пред: ${c.advCnt}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="card-label">Доплат (кол-во)</div>
+      <div class="card-value" style="color:#b794f4">${s.surCnt}</div>
+      ${c?`<div class="card-sub">пред: ${c.surCnt}</div>`:''}
+    </div>
+    <div class="card">
+      <div class="card-label">Всего транзакций</div>
+      <div class="card-value" style="color:#f6e05e">${s.count}</div>
+      ${c?`<div class="card-sub">пред: ${c.count}</div>`:''}
+    </div>
+  </div>`;
+}
+
+/* ── Chart placeholder ── */
+function renderChart(series, cseries) {
+  return `<div class="chart-wrap">
+    <div class="chart-title">Выручка по периодам</div>
+    <div class="chart-canvas-wrap"><canvas id="mainChart"></canvas></div>
+  </div>`;
+}
+
+function drawChart(series, cseries, from, to, cmp) {
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  const canvas = document.getElementById('mainChart');
+  if (!canvas) return;
+
+  const labels = series.map(s => s.label);
+  const datasets = [
+    {
+      label: 'Авансы',
+      data: series.map(s => s.adv),
+      backgroundColor: 'rgba(118,228,247,.75)',
+      stack: 'A',
+    },
+    {
+      label: 'Доплаты',
+      data: series.map(s => s.sur),
+      backgroundColor: 'rgba(183,148,244,.75)',
+      stack: 'A',
+    },
+  ];
+
+  if (cseries && cmp) {
+    // align comparison by index (period offset)
+    datasets.push({
+      label: `Авансы (${fmtD(cmp.from)}–${fmtD(cmp.to)})`,
+      data: cseries.map(s => s.adv),
+      backgroundColor: 'rgba(118,228,247,.3)',
+      borderColor: 'rgba(118,228,247,.6)',
+      borderWidth: 1,
+      stack: 'B',
+    },{
+      label: `Доплаты (${fmtD(cmp.from)}–${fmtD(cmp.to)})`,
+      data: cseries.map(s => s.sur),
+      backgroundColor: 'rgba(183,148,244,.3)',
+      borderColor: 'rgba(183,148,244,.6)',
+      borderWidth: 1,
+      stack: 'B',
+    });
+    // extend labels if comparison has more items
+    while (labels.length < cseries.length) labels.push(cseries[labels.length].label);
+  }
+
+  chartInst = new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#a0aec0', font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: $${fmtN(ctx.parsed.y)}`,
+            footer: items => {
+              const total = items.reduce((s,i) => s + i.parsed.y, 0);
+              return `Итого: $${fmtN(total)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color:'#718096', maxRotation:45 }, grid: { color:'#2d3748' } },
+        y: { ticks: { color:'#718096', callback: v => '$'+fmtN(v) }, grid: { color:'#2d3748' } },
+      }
+    }
+  });
+}
+
+/* ── Breakdown tables ── */
+function renderBreakdownTable(items, title, showCounts) {
+  const maxTotal = Math.max(...items.map(i => i.total), 1);
+  const rows = items.map(i => {
+    const pct = (i.total/maxTotal*100).toFixed(0);
+    const sepStyle = i.isSummary ? 'style="border-top:2px solid #4a5568"' : '';
+    const counts = showCounts && (i.advCnt != null)
+      ? `<div style="font-size:.73rem;color:#718096;margin-top:2px">
+           <span style="color:#76e4f7">${i.advCnt} авансов</span>
+           &nbsp;·&nbsp;
+           <span style="color:#b794f4">${i.surCnt} доплат</span>
+         </div>`
+      : '';
+    return `<div class="breakdown-row" ${sepStyle}>
+      <span class="bd-name">${i.name}</span>
+      <div class="bd-vals">
+        <div class="bd-total">${fmt(i.total)}</div>
+        <div><span class="bd-adv">↑${fmt(i.adv)}</span>&nbsp;<span class="bd-sur">↓${fmt(i.sur)}</span></div>
+        ${counts}
+        <div class="bd-bar-wrap"><div class="bd-bar" style="width:${pct}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="breakdown">
+    <div class="breakdown-title">${title}</div>
+    ${rows || '<div style="color:#718096;font-size:.83rem">Нет данных</div>'}
+  </div>`;
+}
+
+function renderBreakdowns(byShop, bySrc, byChan) {
+  return `<div class="breakdown-grid">
+    ${renderBreakdownTable(byShop, 'По магазину', true)}
+    ${renderBreakdownTable(bySrc,  'По источнику оплаты', true)}
+    ${renderBreakdownTable(byChan, 'По каналу', true)}
+  </div>`;
+}
+
+
+/* ── Timeline table ── */
+function renderTable(series, cseries) {
+  if (!series.length) return `<div class="empty">Нет данных за выбранный период</div>`;
+
+  const hasCmp = !!cseries;
+  const head = `<tr>
+    <th>Период</th>
+    <th>Итого</th>
+    <th>Авансы</th>
+    <th style="color:#76e4f7">кол-во</th>
+    <th>Доплаты</th>
+    <th style="color:#b794f4">кол-во</th>
+    ${hasCmp ? '<th>Итого (пред.)</th><th>Δ</th>' : ''}
+  </tr>`;
+
+  const trows = series.map((s,i) => {
+    const total = s.adv + s.sur;
+    const cRow  = hasCmp && cseries[i];
+    const cTotal = cRow ? cRow.adv + cRow.sur : null;
+    let deltaTd = '';
+    if (hasCmp) {
+      if (cTotal != null && cTotal > 0) {
+        const d = (total - cTotal)/cTotal*100;
+        deltaTd = `<td class="${d>=0?'t-delta-up':'t-delta-dn'}">${d>=0?'▲':'▼'}${Math.abs(d).toFixed(1)}%</td>`;
+      } else {
+        deltaTd = `<td class="t-cnt">—</td>`;
+      }
+    }
+    return `<tr>
+      <td>${s.label}</td>
+      <td class="t-total">${fmt(total)}</td>
+      <td class="t-adv">${fmt(s.adv)}</td>
+      <td class="t-cnt" style="color:#76e4f7">${s.advCnt}</td>
+      <td class="t-sur">${fmt(s.sur)}</td>
+      <td class="t-cnt" style="color:#b794f4">${s.surCnt}</td>
+      ${hasCmp ? `<td class="t-cnt">${cRow ? fmt(cTotal) : '—'}</td>${deltaTd}` : ''}
+    </tr>`;
+  }).join('');
+
+  // total row
+  const totAdv    = series.reduce((s,r)=>s+r.adv,0);
+  const totSur    = series.reduce((s,r)=>s+r.sur,0);
+  const totAdvCnt = series.reduce((s,r)=>s+r.advCnt,0);
+  const totSurCnt = series.reduce((s,r)=>s+r.surCnt,0);
+  const totCnt    = totAdvCnt + totSurCnt;
+  let totCmp = '', totDelta = '';
+  if (hasCmp && cseries) {
+    const cTot = cseries.reduce((s,r)=>s+r.adv+r.sur,0);
+    totCmp = `<td class="t-cnt">${fmt(cTot)}</td>`;
+    const d = cTot > 0 ? (totAdv+totSur-cTot)/cTot*100 : 0;
+    totDelta = `<td class="${d>=0?'t-delta-up':'t-delta-dn'}">${d>=0?'▲':'▼'}${Math.abs(d).toFixed(1)}%</td>`;
+  }
+  const totalRow = `<tr style="background:#2d3748;font-weight:600">
+    <td>ИТОГО</td>
+    <td class="t-total">${fmt(totAdv+totSur)}</td>
+    <td class="t-adv">${fmt(totAdv)}</td>
+    <td class="t-cnt" style="color:#76e4f7">${totAdvCnt}</td>
+    <td class="t-sur">${fmt(totSur)}</td>
+    <td class="t-cnt" style="color:#b794f4">${totSurCnt}</td>
+    ${hasCmp ? totCmp + totDelta : ''}
+  </tr>`;
+
+  return `<div class="table-wrap">
+    <div class="table-title">Детализация по периодам</div>
+    <table><thead>${head}</thead><tbody>${trows}${totalRow}</tbody></table>
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+document.getElementById('dateTo').value = today();
+loadData();
+setInterval(loadData, REFRESH_MS);
+</script>
+</body>
+</html>

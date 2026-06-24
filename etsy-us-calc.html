@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Etsy US Stores — Калькулятор экономики</title>
+<script>
+(function(){
+  const KEY='etsy_auth', PWD='Etsy';
+  if(sessionStorage.getItem(KEY)!=='1'){
+    document.addEventListener('DOMContentLoaded',function(){
+      const overlay=document.getElementById('auth-overlay');
+      overlay.style.display='flex';
+      document.getElementById('auth-form').onsubmit=function(e){
+        e.preventDefault();
+        if(document.getElementById('auth-input').value===PWD){
+          sessionStorage.setItem(KEY,'1');
+          overlay.style.display='none';
+        } else {
+          document.getElementById('auth-error').style.display='block';
+          document.getElementById('auth-input').value='';
+        }
+      };
+    });
+  }
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:20px 24px}
+h1{font-size:1.35rem;font-weight:700;color:#fff}
+h2{font-size:.82rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px}
+
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+.badge{background:#2d3748;border:1px solid #4a5568;border-radius:6px;padding:4px 10px;font-size:.75rem;color:#a0aec0}
+
+.grid-2{display:grid;grid-template-columns:420px 1fr;gap:16px;align-items:start}
+@media(max-width:1060px){.grid-2{grid-template-columns:1fr}}
+.section{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 18px;margin-bottom:14px}
+
+/* inputs */
+.input-group{margin-bottom:9px}
+.input-group label{display:block;font-size:.74rem;color:#718096;margin-bottom:3px}
+.input-row{display:flex;align-items:center;gap:7px}
+.input-row input{flex:1;background:#0f1117;border:1px solid #2d3748;color:#90cdf4;padding:5px 9px;border-radius:7px;font-size:.84rem;text-align:right;width:100%;font-family:inherit}
+.input-row input:focus{outline:none;border-color:#4c51bf}
+.input-unit{font-size:.73rem;color:#4a5568;white-space:nowrap;min-width:28px}
+
+/* startup rows */
+.st-row{display:grid;grid-template-columns:1fr 90px 28px;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid #1a202c;font-size:.82rem}
+.st-row.total{border-top:1px solid #2d3748;border-bottom:none;padding-top:9px;font-weight:700;color:#fbd38d}
+.st-label{color:#a0aec0}
+.st-input{width:100%;background:#0f1117;border:1px solid #2d3748;color:#90cdf4;padding:4px 7px;border-radius:6px;font-size:.82rem;text-align:right;font-family:inherit}
+.st-input:focus{outline:none;border-color:#4c51bf}
+.st-unit{font-size:.72rem;color:#4a5568;text-align:right}
+.st-total{color:#fbd38d;font-size:.84rem;text-align:right}
+
+/* price table */
+.price-table{width:100%;border-collapse:collapse;font-size:.81rem}
+.price-table th{color:#4a5568;font-weight:500;text-align:right;padding:4px 5px;border-bottom:1px solid #2d3748}
+.price-table th:first-child{text-align:left}
+.price-table td{padding:5px 5px;border-bottom:1px solid #1a202c}
+.price-table td:first-child{color:#e2e8f0}
+.price-table td input{background:#0f1117;border:1px solid #2d3748;color:#90cdf4;padding:4px 5px;border-radius:5px;font-size:.81rem;text-align:right;width:76px;font-family:inherit}
+.price-table td input:focus{outline:none;border-color:#4c51bf}
+.price-table .calc{color:#68d391;text-align:right}
+
+/* tabs */
+.tabs{display:flex;gap:5px;margin-bottom:14px}
+.tab{flex:1;padding:8px 6px;border-radius:9px;border:1px solid #2d3748;background:#1a202c;color:#718096;font-size:.78rem;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;line-height:1.3}
+.tab.active.s1{background:#2d3748;border-color:#4a5568;color:#a0aec0}
+.tab.active.s2{background:#2d2000;border-color:#b7791f;color:#fbd38d}
+.tab.active.s3{background:#1a3a2a;border-color:#276749;color:#68d391}
+.tab.active.s4{background:#1a2a4a;border-color:#2b4b8c;color:#76e4f7}
+.tab:hover:not(.active){border-color:#4a5568;color:#e2e8f0}
+
+/* KPI */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.card{background:#1a202c;border:1px solid #2d3748;border-radius:10px;padding:13px 15px}
+.card-label{font-size:.69rem;color:#718096;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.card-value{font-size:1.38rem;font-weight:700}
+.card-sub{font-size:.71rem;color:#718096;margin-top:3px}
+.green{color:#68d391}.red{color:#fc8181}.blue{color:#76e4f7}.yellow{color:#fbd38d}.gray{color:#718096}
+
+/* P&L */
+.pnl-wrap{overflow-x:auto}
+.pnl{width:100%;border-collapse:collapse;font-size:.8rem}
+.pnl th{color:#4a5568;font-weight:500;text-align:right;padding:6px 8px;border-bottom:1px solid #2d3748;white-space:nowrap}
+.pnl th:first-child{text-align:left;color:#718096;min-width:180px}
+.pnl td{padding:5px 8px;border-bottom:1px solid #1a202c;text-align:right;white-space:nowrap}
+.pnl td:first-child{text-align:left;color:#a0aec0}
+.pnl tr.total td{font-weight:700;border-top:1px solid #2d3748;border-bottom:2px solid #2d3748}
+.pnl tr.section-header td{color:#4a5568;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;padding-top:11px;padding-bottom:2px;border-bottom:none}
+.pnl tr.subtotal td{font-weight:600;color:#e2e8f0}
+.pnl .neg{color:#fc8181}.pnl .pos{color:#68d391}.pnl .zero{color:#718096}
+/* inline input inside P&L */
+.pnl-input{background:#0f1117;border:1px solid #2d3748;color:#90cdf4;padding:3px 6px;border-radius:5px;font-size:.8rem;text-align:right;width:80px;font-family:inherit}
+.pnl-input:focus{outline:none;border-color:#4c51bf}
+
+/* chart */
+.chart-wrap{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:14px 18px;margin-bottom:14px}
+.chart-title{font-size:.77rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.chart-canvas-wrap{position:relative;height:210px}
+
+.divider{border:none;border-top:1px solid #2d3748;margin:12px 0}
+
+/* payback */
+.payback-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #2d3748;font-size:.84rem}
+.payback-row:last-child{border-bottom:none}
+.payback-label{color:#a0aec0}
+.payback-val{font-weight:700}
+
+.note{font-size:.71rem;color:#4a5568;margin-top:7px;line-height:1.5}
+
+.store-tabs{display:flex;gap:6px;margin-bottom:12px}
+.store-tab{padding:5px 13px;border-radius:7px;border:1px solid #2d3748;background:#0f1117;color:#718096;font-size:.79rem;cursor:pointer;transition:all .15s}
+.store-tab.active{background:#2d4a6e;border-color:#3182ce;color:#90cdf4}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Etsy US Stores — Калькулятор экономики</h1>
+  <div class="badge">2 магазина · LLC Delaware · Фулфилмент-центр</div>
+</header>
+
+<div class="grid-2">
+
+<!-- ═══ LEFT: SETTINGS ═══ -->
+<div>
+
+  <!-- Разовые затраты -->
+  <div class="section">
+    <h2>Разовые затраты на открытие</h2>
+    <div class="st-row"><span class="st-label">Регистрация LLC</span><input class="st-input" id="st_llc1" type="number" value="399" oninput="calc()"><span class="st-unit">×2</span></div>
+    <div class="st-row"><span class="st-label">EIN от IRS (за каждую LLC)</span><input class="st-input" id="st_ein" type="number" value="0" oninput="calc()"><span class="st-unit">×2</span></div>
+    <div class="st-row"><span class="st-label">Открытие банк. счёта</span><input class="st-input" id="st_bank" type="number" value="35" oninput="calc()"><span class="st-unit">×2</span></div>
+    <div class="st-row"><span class="st-label">eSIM-устройство (гаджет)</span><input class="st-input" id="st_device" type="number" value="200" oninput="calc()"><span class="st-unit">$</span></div>
+    <div class="st-row"><span class="st-label">Покупка eSIM-номера</span><input class="st-input" id="st_esim" type="number" value="20" oninput="calc()"><span class="st-unit">×2</span></div>
+    <div class="st-row"><span class="st-label">Сбор Etsy за открытие магазина</span><input class="st-input" id="st_etsy" type="number" value="29" oninput="calc()"><span class="st-unit">×2</span></div>
+    <div class="st-row total"><span class="st-label">ИТОГО разовые затраты</span><span class="st-total" id="st_total">—</span><span class="st-unit"></span></div>
+  </div>
+
+  <!-- Ежемесячные расходы -->
+  <div class="section">
+    <h2>Ежемесячные расходы (1 магазин)</h2>
+
+    <div style="font-size:.71rem;color:#4a5568;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Обслуживание LLC</div>
+    <div class="input-group">
+      <label>Registered agent ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_agent" value="20.75" step="0.01" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Delaware franchise tax ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_ftax" value="25.00" step="0.01" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Mailbox / адрес ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_mail" value="35.00" step="0.01" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+    <div class="input-group">
+      <label>eSIM номер ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_esim" value="16.67" step="0.01" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div style="font-size:.71rem;color:#4a5568;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Банк</div>
+    <div class="input-group">
+      <label>Обслуживание банк. счёта ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_bank" value="0" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div style="font-size:.71rem;color:#4a5568;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Комиссии Etsy (фикс. часть)</div>
+    <div class="input-group">
+      <label>Листинги + транзакции + прочее ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_etsy_fixed" value="50" step="1" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div style="font-size:.71rem;color:#4a5568;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Прочие операционные</div>
+    <div class="input-group">
+      <label>Прочие операционные ($/мес)</label>
+      <div class="input-row">
+        <input type="number" id="p_other" value="20.00" step="0.01" oninput="calc()">
+        <span class="input-unit">$</span>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <h2>Налоги США</h2>
+    <div class="input-group">
+      <label>Эффективная ставка налога (%)</label>
+      <div class="input-row">
+        <input type="number" id="p_tax" value="0" step="1" oninput="calc()">
+        <span class="input-unit">%</span>
+      </div>
+    </div>
+    <div class="note">LLC — сквозное налогообложение. ~15.3% self-employment + ~8.7% DE state. Уточнить у налогового консультанта.</div>
+  </div>
+
+  <!-- Прайс и объёмы -->
+  <div class="section">
+    <h2>Цены, себестоимость и объёмы</h2>
+    <div class="note" style="margin-bottom:10px">Себестоимость уже включает все комиссии Etsy. Объём — ориентир нормального магазина (среднемес 2025).</div>
+    <table class="price-table">
+      <thead>
+        <tr>
+          <th style="text-align:left">Размер</th>
+          <th>Цена $</th>
+          <th>Себест. $</th>
+          <th>Марж. $</th>
+          <th>Ед</th>
+        </tr>
+      </thead>
+      <tbody id="price-body"></tbody>
+      <tfoot>
+        <tr style="border-top:1px solid #2d3748">
+          <td style="color:#e2e8f0;font-weight:600;padding:6px 5px">ИТОГО</td>
+          <td style="text-align:right;padding:6px 5px;color:#76e4f7;font-weight:600" id="tot_rev">—</td>
+          <td style="text-align:right;padding:6px 5px;color:#fc8181;font-weight:600" id="tot_cogs">—</td>
+          <td style="text-align:right;padding:6px 5px;color:#68d391;font-weight:600" id="tot_margin">—</td>
+          <td style="text-align:right;padding:6px 5px;color:#e2e8f0;font-weight:600" id="tot_units">—</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="color:#4a5568;font-size:.72rem;padding:4px 5px">Средний чек</td>
+          <td colspan="2" style="text-align:right;padding:4px 5px;color:#fbd38d;font-weight:700;font-size:.9rem" id="avg_check">—</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <!-- Доработка дизайнера -->
+  <div class="section">
+    <h2>Доработка дизайнера (доп. услуга)</h2>
+    <div class="note" style="margin-bottom:10px">Допродажа на заказ. Конверсия — % от оплаченных картин, которые покупают доработку этой категории. Доход/затраты масштабируются вместе с объёмом продаж в каждом сценарии.<br>* "Ожид. доход с заказа" — вероятностное среднее (доход × конверсию) на 1 заказ картины, включая те, что ничего не докупили — именно это число умножается на кол-во картин в P&L.</div>
+    <table class="price-table">
+      <thead>
+        <tr>
+          <th style="text-align:left">Категория</th>
+          <th>Цена $</th>
+          <th>Себест. $</th>
+          <th>Марж. %</th>
+          <th>Конв. %</th>
+        </tr>
+      </thead>
+      <tbody id="design-body"></tbody>
+      <tfoot>
+        <tr style="border-top:1px solid #2d3748">
+          <td colspan="3" style="color:#4a5568;font-size:.72rem;padding:6px 5px">Конверсия, суммарно (% заказов с допродажей)</td>
+          <td colspan="2" style="text-align:right;padding:6px 5px;color:#fbd38d;font-weight:700" id="dsg_avg_conv">—</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="color:#4a5568;font-size:.72rem;padding:4px 5px">Средний чек допродажи (если купили)</td>
+          <td colspan="2" style="text-align:right;padding:4px 5px;color:#76e4f7;font-weight:700" id="dsg_check">—</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="color:#4a5568;font-size:.72rem;padding:4px 5px">Маржа допродажи, % (средневзв.)</td>
+          <td colspan="2" style="text-align:right;padding:4px 5px;color:#68d391;font-weight:700" id="dsg_margin_pct">—</td>
+        </tr>
+        <tr>
+          <td colspan="3" style="color:#4a5568;font-size:.72rem;padding:4px 5px">Ожид. доход с 1 заказа картины*</td>
+          <td colspan="2" style="text-align:right;padding:4px 5px;color:#a0aec0;font-weight:600" id="dsg_avg_rev">—</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+</div><!-- /left -->
+
+<!-- ═══ RIGHT: OUTPUT ═══ -->
+<div>
+
+  <!-- Scenario tabs -->
+  <div class="tabs">
+    <div class="tab active s1" onclick="setScenario(1)">Сц. 1<br><small>Нулевой</small></div>
+    <div class="tab s2" onclick="setScenario(2)">Сц. 2<br><small>Безубыток</small></div>
+    <div class="tab s3" onclick="setScenario(3)">Сц. 3<br><small>Медиана</small></div>
+    <div class="tab s4" onclick="setScenario(4)">Сц. 4<br><small>Норма</small></div>
+  </div>
+
+  <!-- KPI -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Выручка</div>
+      <div class="card-value blue" id="kpi_rev">—</div>
+      <div class="card-sub" id="kpi_rev_sub">в месяц</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Все расходы</div>
+      <div class="card-value yellow" id="kpi_costs">—</div>
+      <div class="card-sub">перем. + фикс.</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Чистая прибыль</div>
+      <div class="card-value" id="kpi_net">—</div>
+      <div class="card-sub" id="kpi_net_sub">после налогов</div>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="chart-wrap">
+    <div class="chart-title" id="chart-title">P&L по 4 сценариям — 2 магазина ($/мес)</div>
+    <div class="chart-canvas-wrap"><canvas id="scenChart"></canvas></div>
+  </div>
+
+  <!-- Store toggle -->
+  <div class="store-tabs">
+    <div class="store-tab active" onclick="setStore('both')">Оба магазина</div>
+    <div class="store-tab" onclick="setStore('s1')">Магазин 1</div>
+    <div class="store-tab" onclick="setStore('s2')">Магазин 2</div>
+  </div>
+
+  <!-- P&L table -->
+  <div class="section">
+    <h2 id="pnl-title">P&L — Все сценарии ($/мес)</h2>
+    <div class="pnl-wrap">
+      <table class="pnl" id="pnl-table"></table>
+    </div>
+    <div class="note" style="margin-top:10px">* ФОТ, ОПР, Маркетинг вводятся вручную прямо в таблице (синие поля). Себестоимость включает комиссии Etsy.</div>
+  </div>
+
+  <!-- Payback -->
+  <div class="section">
+    <h2>Окупаемость и безубыток</h2>
+    <div class="payback-row">
+      <span class="payback-label">Разовые затраты на открытие (2 магазина)</span>
+      <span class="payback-val yellow" id="pb_startup">—</span>
+    </div>
+    <div class="payback-row">
+      <span class="payback-label">Срок окупаемости при Сц.4 (норма)</span>
+      <span class="payback-val" id="pb_months">—</span>
+    </div>
+    <div class="payback-row">
+      <span class="payback-label">Безубыточная выручка — оба магазина</span>
+      <span class="payback-val blue" id="pb_bep">—</span>
+    </div>
+    <div class="payback-row" style="padding-left:12px">
+      <span class="payback-label" style="color:#4a5568">↳ Магазин 1</span>
+      <span class="payback-val" id="pb_bep_s1" style="color:#718096">—</span>
+    </div>
+    <div class="payback-row" style="padding-left:12px">
+      <span class="payback-label" style="color:#4a5568">↳ Магазин 2</span>
+      <span class="payback-val" id="pb_bep_s2" style="color:#718096">—</span>
+    </div>
+    <div class="payback-row">
+      <span class="payback-label">Картин для выхода в б/у — оба магазина</span>
+      <span class="payback-val blue" id="pb_bep_units">—</span>
+    </div>
+    <div class="payback-row" style="padding-left:12px">
+      <span class="payback-label" style="color:#4a5568">↳ Магазин 1</span>
+      <span class="payback-val" id="pb_bep_units_s1" style="color:#718096">—</span>
+    </div>
+    <div class="payback-row" style="padding-left:12px">
+      <span class="payback-label" style="color:#4a5568">↳ Магазин 2</span>
+      <span class="payback-val" id="pb_bep_units_s2" style="color:#718096">—</span>
+    </div>
+    <div class="payback-row">
+      <span class="payback-label">Средний чек (по текущему миксу)</span>
+      <span class="payback-val" id="pb_avg_check">—</span>
+    </div>
+  </div>
+
+
+</div><!-- /right -->
+</div><!-- /grid -->
+
+<script>
+const SIZES = ['25×35','30×40','40×50','50×60','60×70'];
+const DEF_PRICES = [280.90, 296.51, 345.96, 389.35, 497.80];
+const DEF_VARCOS = [131.80, 145.00, 175.00, 220.00, 290.00];
+const DEF_UNITS  = [13, 28, 38, 24, 13];
+
+const DSG_CATS      = [1,2,3,4,5,6,7];
+const DEF_DSG_PRICE = [30, 50, 70, 100, 160, 210, 260];
+const DEF_DSG_COST  = [15.3, 21.2, 29.1, 37.9, 61.5, 78.2, 95.9];
+const DEF_DSG_CONV  = [19.44, 18.16, 10.61, 7.67, 3.20, 1.66, 2.81]; // % от заказов
+
+let curScen = 1, curStore = 'both';
+let scenChart = null, sizeChart = null;
+
+// Per-store manual inputs — [S1 Ноль, S2 Безубыток, S3 Медиана, S4 Норма]
+const manual1 = { fot:[0,1000,2500,5000], opr:[0,200,500,1000], mktg:[0,1000,3000,6000] };
+const manual2 = { fot:[0,1000,2500,5000], opr:[0,200,500,1000], mktg:[0,1000,3000,6000] };
+
+function buildPriceTable() {
+  document.getElementById('price-body').innerHTML = SIZES.map((sz,i) => `
+    <tr>
+      <td>${sz}</td>
+      <td><input type="number" id="pr_${i}" value="${DEF_PRICES[i]}" step="0.01" oninput="calc()"></td>
+      <td><input type="number" id="vc_${i}" value="${DEF_VARCOS[i]}" step="0.01" oninput="calc()"></td>
+      <td class="calc" id="mg_${i}">—</td>
+      <td><input type="number" id="un_${i}" value="${DEF_UNITS[i]}" step="1" oninput="calc()"></td>
+    </tr>`).join('');
+}
+
+function buildDesignTable() {
+  document.getElementById('design-body').innerHTML = DSG_CATS.map((c,i) => `
+    <tr>
+      <td>Категория ${c}</td>
+      <td><input type="number" id="dp_${i}" value="${DEF_DSG_PRICE[i]}" step="0.01" oninput="calc()"></td>
+      <td><input type="number" id="dc_${i}" value="${DEF_DSG_COST[i]}" step="0.01" oninput="calc()"></td>
+      <td class="calc" id="dm_${i}">—</td>
+      <td><input type="number" id="dv_${i}" value="${DEF_DSG_CONV[i]}" step="0.01" oninput="calc()"></td>
+    </tr>`).join('');
+}
+
+const $ = id => document.getElementById(id);
+const v = id => parseFloat($(id).value) || 0;
+const fmt = n => (n < 0 ? '-$' : '$') + Math.abs(Math.round(n)).toLocaleString('en-US');
+const fmtD = n => '$' + Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = n => (n >= 0 ? '+' : '') + (n*100).toFixed(1) + '%';
+
+function getInfra() {
+  return v('p_agent')+v('p_ftax')+v('p_mail')+v('p_esim')+v('p_bank')+v('p_other')+v('p_etsy_fixed');
+}
+
+// Build P&L for one store given its manual cost object
+function buildStoreScenario(idx, manualObj, prices, varcos, units4, infra, dAvgRev, dAvgCost) {
+  const taxRate = v('p_tax') / 100;
+  const rev4  = SIZES.reduce((s,_,i) => s + prices[i]*units4[i], 0);
+  const cogs4 = SIZES.reduce((s,_,i) => s + varcos[i]*units4[i], 0);
+  const totalOrders4 = units4.reduce((a,b)=>a+b,0);
+  const revFull  = rev4 + totalOrders4*dAvgRev;
+  const cogsFull = cogs4 + totalOrders4*dAvgCost;
+  const cmRatio  = revFull > 0 ? (revFull-cogsFull)/revFull : 0;
+
+  const fot  = manualObj.fot[idx];
+  const opr  = manualObj.opr[idx];
+  const mktg = manualObj.mktg[idx];
+  const totalFixed = infra + fot + opr + mktg;
+
+  let scale;
+  if (idx === 0) scale = 0;
+  else if (idx === 1) {
+    // Break-even: opProfit = 0, scale full picture+design revenue to match BEP for THIS store's costs
+    const bep = cmRatio > 0 ? totalFixed / cmRatio : Infinity;
+    scale = (revFull > 0 && isFinite(bep)) ? bep/revFull : 0;
+  } else if (idx === 2) scale = 0.5; // медиана
+  else scale = 1;
+
+  const units = units4.map(u => u*scale);
+  const totalOrders = totalOrders4*scale;
+  const picRev   = rev4*scale;
+  const picCogs  = cogs4*scale;
+  const designRev  = totalOrders*dAvgRev;
+  const designCost = totalOrders*dAvgCost;
+  const rev   = picRev + designRev;
+  const cogs  = picCogs + designCost;
+  const gross = rev - cogs;
+  const opProfit = gross - totalFixed;
+  const tax = Math.max(0, opProfit * taxRate);
+  const net = opProfit - tax;
+  return { rev, cogs, gross, infra, fot, opr, mktg, totalFixed, opProfit, tax, net, picRev, picCogs, designRev, designCost, totalOrders };
+}
+
+function addScenarios(a, b) {
+  return {
+    rev: a.rev+b.rev, cogs: a.cogs+b.cogs, gross: a.gross+b.gross,
+    infra: a.infra+b.infra, fot: a.fot+b.fot, opr: a.opr+b.opr, mktg: a.mktg+b.mktg,
+    totalFixed: a.totalFixed+b.totalFixed, opProfit: a.opProfit+b.opProfit,
+    tax: a.tax+b.tax, net: a.net+b.net,
+    picRev: a.picRev+b.picRev, picCogs: a.picCogs+b.picCogs,
+    designRev: a.designRev+b.designRev, designCost: a.designCost+b.designCost,
+    totalOrders: a.totalOrders+b.totalOrders
+  };
+}
+
+function calc() {
+  const startup = v('st_llc1')*2 + v('st_ein')*2 + v('st_bank')*2 + v('st_device') + v('st_esim')*2 + v('st_etsy')*2;
+  $('st_total').textContent = fmt(startup);
+
+  const prices = SIZES.map((_,i) => v('pr_'+i));
+  const varcos = SIZES.map((_,i) => v('vc_'+i));
+  const units4 = SIZES.map((_,i) => v('un_'+i));
+  const infra  = getInfra();
+
+  // margins + price table totals
+  SIZES.forEach((_,i) => {
+    const mg = prices[i]-varcos[i];
+    const el = $('mg_'+i);
+    el.textContent = fmtD(mg);
+    el.style.color = mg >= 0 ? '#68d391' : '#fc8181';
+  });
+  const totUnits = units4.reduce((a,b)=>a+b,0);
+  const totRev   = SIZES.reduce((s,_,i)=>s+prices[i]*units4[i],0);
+  const totCogs  = SIZES.reduce((s,_,i)=>s+varcos[i]*units4[i],0);
+  $('tot_units').textContent  = totUnits+' шт';
+  $('tot_rev').textContent    = fmt(totRev);
+  $('tot_cogs').textContent   = fmt(totCogs);
+  $('tot_margin').textContent = fmt(totRev-totCogs);
+  const avgCheck = totUnits > 0 ? totRev/totUnits : 0;
+  $('avg_check').textContent  = avgCheck > 0 ? fmtD(avgCheck) : '—';
+
+  // Design upsell: per-category margin display
+  const dPrices = DSG_CATS.map((_,i)=>v('dp_'+i));
+  const dCosts  = DSG_CATS.map((_,i)=>v('dc_'+i));
+  const dConvs  = DSG_CATS.map((_,i)=>v('dv_'+i)/100);
+  DSG_CATS.forEach((_,i) => {
+    const mgPct = dPrices[i] > 0 ? (dPrices[i]-dCosts[i])/dPrices[i]*100 : 0;
+    const el = $('dm_'+i);
+    el.textContent = mgPct.toFixed(1)+'%';
+    el.style.color = mgPct >= 0 ? '#68d391' : '#fc8181';
+  });
+
+  // Ожидаемый доход/себестоимость на 1 заказ картины (вероятностное среднее, используется для масштабирования)
+  const dAvgRev  = DSG_CATS.reduce((s,_,i)=>s+dPrices[i]*dConvs[i],0);
+  const dAvgCost = DSG_CATS.reduce((s,_,i)=>s+dCosts[i]*dConvs[i],0);
+  const totalConv = dConvs.reduce((a,b)=>a+b,0);
+  // Средний чек допродажи: доход, делённый на долю заказов, которые купили хоть что-то
+  const dCheck = totalConv > 0 ? dAvgRev/totalConv : 0;
+  const dMarginPct = dAvgRev > 0 ? (dAvgRev-dAvgCost)/dAvgRev*100 : 0;
+
+  $('dsg_avg_conv').textContent   = (totalConv*100).toFixed(1)+'%';
+  $('dsg_check').textContent      = dCheck > 0 ? fmtD(dCheck) : '—';
+  $('dsg_margin_pct').textContent = dMarginPct.toFixed(1)+'%';
+  $('dsg_avg_rev').textContent    = fmtD(dAvgRev)+' / '+fmtD(dAvgCost)+' себест.';
+
+  // Per-store scenarios
+  const Sa = [0,1,2,3].map(i => buildStoreScenario(i, manual1, prices, varcos, units4, infra, dAvgRev, dAvgCost));
+  const Sb = [0,1,2,3].map(i => buildStoreScenario(i, manual2, prices, varcos, units4, infra, dAvgRev, dAvgCost));
+  const Sc = [0,1,2,3].map(i => addScenarios(Sa[i], Sb[i])); // both
+
+  const S = curStore === 's1' ? Sa : curStore === 's2' ? Sb : Sc;
+
+  renderKPI(S);
+  renderPnL(S, Sa, Sb);
+  renderScenChart(Sc); // chart always shows combined
+  renderSizeChart(prices, units4, varcos);
+  renderPayback(startup, Sc, Sa, Sb, avgCheck);
+}
+
+function renderKPI(S) {
+  const s = S[curScen-1];
+  const storeLabel = curStore==='both' ? '2 магазина / мес' : '1 магазин / мес';
+  $('kpi_rev').textContent     = fmt(s.rev);
+  $('kpi_rev_sub').textContent = storeLabel;
+  $('kpi_costs').textContent   = fmt(s.cogs+s.totalFixed);
+  $('kpi_net').textContent     = fmt(s.net);
+  $('kpi_net').className       = 'card-value '+(s.net>0.5?'green':s.net<-0.5?'red':'gray');
+  $('kpi_net_sub').textContent = s.net>=0 ? 'прибыль ✓' : 'убыток';
+}
+
+function renderPnL(S, Sa, Sb) {
+  const storeLabel = curStore==='both'?'2 магазина':curStore==='s1'?'Магазин 1':'Магазин 2';
+  $('pnl-title').textContent = `P&L — все сценарии (${storeLabel}, $/мес)`;
+
+  const heads = ['Статья','Сц.1 Ноль','Сц.2 Безубыток','Сц.3 Медиана','Сц.4 Норма'];
+  let html = '<thead><tr>'+heads.map((h,i)=>`<th${i>0?' style="min-width:120px"':''}>${h}</th>`).join('')+'</tr></thead><tbody>';
+
+  const row = (lbl, getter, cls='', isPct=false) => {
+    html += `<tr class="${cls}"><td>${lbl}</td>`;
+    S.forEach(s => {
+      const val = getter(s);
+      const disp = val===null ? '—' : isPct ? pct(val) : fmt(val);
+      const c = (cls==='total'||cls==='subtotal') ? (val>0.5?'pos':val<-0.5?'neg':'zero') : '';
+      html += `<td class="${c}">${disp}</td>`;
+    });
+    html += '</tr>';
+  };
+
+  const secRow = t => { html += `<tr class="section-header"><td colspan="5">${t}</td></tr>`; };
+
+  const manualRow = (lbl, key) => {
+    html += `<tr><td>${lbl}</td>`;
+    [0,1,2,3].forEach(si => {
+      if (curStore === 'both') {
+        const v1 = manual1[key][si], v2 = manual2[key][si];
+        html += `<td style="text-align:right">
+          <div style="color:#90cdf4;font-weight:600;margin-bottom:3px">${fmt(v1+v2)}</div>
+          <div style="display:flex;gap:3px;justify-content:flex-end;align-items:center">
+            <span style="font-size:.67rem;color:#4a5568">М1</span>
+            <input class="pnl-input" style="width:58px;font-size:.72rem" type="number" value="${v1}" oninput="setManual('1','${key}',${si},this.value)">
+          </div>
+          <div style="display:flex;gap:3px;justify-content:flex-end;align-items:center;margin-top:2px">
+            <span style="font-size:.67rem;color:#4a5568">М2</span>
+            <input class="pnl-input" style="width:58px;font-size:.72rem" type="number" value="${v2}" oninput="setManual('2','${key}',${si},this.value)">
+          </div>
+        </td>`;
+      } else {
+        const obj = curStore==='s2' ? manual2 : manual1;
+        const sn  = curStore==='s2' ? '2' : '1';
+        html += `<td><input class="pnl-input" type="number" value="${obj[key][si]}" oninput="setManual('${sn}','${key}',${si},this.value)"></td>`;
+      }
+    });
+    html += '</tr>';
+  };
+
+  secRow('ДОХОДЫ');
+  row('Выручка (картины)', s=>s.picRev);
+  row('Доп. выручка (доработка дизайнера)', s=>s.designRev);
+  row('ИТОГО ВЫРУЧКА', s=>s.rev, 'subtotal');
+  secRow('ПЕРЕМЕННЫЕ ЗАТРАТЫ');
+  row('Себестоимость картин (COGS)', s=>s.picCogs);
+  row('Себестоимость доработки', s=>s.designCost);
+  row('ИТОГО ПЕРЕМЕННЫЕ', s=>s.cogs, 'subtotal');
+  secRow('');
+  row('ВАЛОВАЯ ПРИБЫЛЬ', s=>s.gross, 'subtotal');
+  secRow('ПОСТОЯННЫЕ ЗАТРАТЫ');
+  row('Инфраструктура (LLC, банк, eSIM, mailbox)', s=>s.infra);
+  manualRow('ФОТ', 'fot');
+  manualRow('ОПР (прочие)', 'opr');
+  manualRow('Маркетинг (Etsy Ads)', 'mktg');
+  row('ИТОГО ПОСТОЯННЫЕ', s=>s.totalFixed, 'subtotal');
+  secRow('');
+  row('ОПЕРАЦ. ПРИБЫЛЬ (EBIT)', s=>s.opProfit, 'subtotal');
+  secRow('НАЛОГИ США');
+  row(`Налог (~${v('p_tax')}%, pass-through LLC)`, s=>s.tax);
+  row('ЧИСТАЯ ПРИБЫЛЬ', s=>s.net, 'total');
+  secRow('');
+  row('Рентабельность (%)', s=>s.rev>0?s.net/s.rev:null, '', true);
+
+  html += '</tbody>';
+  $('pnl-table').innerHTML = html;
+}
+
+function setManual(store, key, si, val) {
+  (store==='2' ? manual2 : manual1)[key][si] = parseFloat(val)||0;
+  calc();
+}
+
+function renderScenChart(S) {
+  const labels = ['Сц.1 Нулевой','Сц.2 Безубыток','Сц.3 Медиана','Сц.4 Норма'];
+  if (scenChart) scenChart.destroy();
+  scenChart = new Chart($('scenChart'), {
+    type:'bar',
+    data:{labels, datasets:[
+      {label:'Себестоимость', data:S.map(s=>s.cogs),   backgroundColor:'#c05621',stack:'c'},
+      {label:'Инфраструктура',data:S.map(s=>s.infra),  backgroundColor:'#744210',stack:'c'},
+      {label:'ФОТ',           data:S.map(s=>s.fot),    backgroundColor:'#553c9a',stack:'c'},
+      {label:'ОПР',           data:S.map(s=>s.opr),    backgroundColor:'#44337a',stack:'c'},
+      {label:'Маркетинг',     data:S.map(s=>s.mktg),   backgroundColor:'#2a4365',stack:'c'},
+      {label:'Налоги',        data:S.map(s=>s.tax),    backgroundColor:'#2c5282',stack:'c'},
+      {label:'Прибыль',       data:S.map(s=>Math.max(0,s.net)), backgroundColor:'#276749',stack:'c'},
+      {label:'Убыток',        data:S.map(s=>Math.min(0,s.net)), backgroundColor:'#9b2c2c',stack:'c'},
+      {label:'Выручка',       data:S.map(s=>s.rev), type:'line', fill:false, borderColor:'#76e4f7', borderWidth:2, pointRadius:5, tension:.3, backgroundColor:'transparent'},
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#718096',font:{size:10}}}},
+      scales:{
+        x:{stacked:true,ticks:{color:'#718096'},grid:{color:'#2d3748'}},
+        y:{stacked:true,ticks:{color:'#718096',callback:n=>'$'+Math.round(n).toLocaleString()},grid:{color:'#2d3748'}}
+      }
+    }
+  });
+}
+
+function renderSizeChart(prices, units4, varcos) {
+  const rev   = SIZES.map((_,i)=>prices[i]*units4[i]);
+  const cogs  = SIZES.map((_,i)=>varcos[i]*units4[i]);
+  const gross = SIZES.map((_,i)=>rev[i]-cogs[i]);
+  if (sizeChart) sizeChart.destroy();
+  sizeChart = new Chart($('sizeChart'),{
+    type:'bar',
+    data:{labels:SIZES,datasets:[
+      {label:'Себестоимость',  data:cogs,  backgroundColor:'#c05621',stack:'s'},
+      {label:'Валовая прибыль',data:gross, backgroundColor:'#276749',stack:'s'},
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#718096',font:{size:10}}}},
+      scales:{
+        x:{stacked:true,ticks:{color:'#718096'},grid:{color:'#2d3748'}},
+        y:{stacked:true,ticks:{color:'#718096',callback:n=>'$'+Math.round(n).toLocaleString()},grid:{color:'#2d3748'}}
+      }
+    }
+  });
+}
+
+function renderPayback(startup, Sc, Sa, Sb, avgCheck) {
+  $('pb_startup').textContent = fmt(startup);
+  const net4 = Sc[3].net;
+  if (net4 > 0) {
+    $('pb_months').textContent = (startup/net4).toFixed(1)+' мес';
+    $('pb_months').className = 'payback-val green';
+  } else {
+    $('pb_months').textContent = 'н/д (убыток)';
+    $('pb_months').className = 'payback-val red';
+  }
+
+  const bepFmt = (rev, unitsEl, revEl) => {
+    $(revEl).textContent = fmt(rev)+'/мес';
+    if (avgCheck > 0 && rev > 0) {
+      $(unitsEl).textContent = Math.ceil(rev/avgCheck)+' картин/мес';
+      $(unitsEl).className = 'payback-val green';
+    } else {
+      $(unitsEl).textContent = '—';
+      $(unitsEl).className = 'payback-val gray';
+    }
+  };
+
+  bepFmt(Sa[1].rev+Sb[1].rev, 'pb_bep_units',    'pb_bep');
+  bepFmt(Sa[1].rev,           'pb_bep_units_s1', 'pb_bep_s1');
+  bepFmt(Sb[1].rev,           'pb_bep_units_s2', 'pb_bep_s2');
+
+  $('pb_avg_check').textContent = avgCheck > 0 ? fmtD(avgCheck) : '—';
+  $('pb_avg_check').className = 'payback-val yellow';
+}
+
+function setScenario(n) {
+  curScen = n;
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.className = 'tab'+(i===n-1?' active s'+(i+1):'');
+  });
+  calc();
+}
+
+function setStore(s) {
+  curStore = s;
+  document.querySelectorAll('.store-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['both','s1','s2'][i]===s);
+  });
+  calc();
+}
+
+buildPriceTable();
+buildDesignTable();
+calc();
+</script>
+<div id="auth-overlay" style="display:none;position:fixed;inset:0;background:#0f1117;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+  <div style="font-size:1.1rem;font-weight:700;color:#fff">Etsy US Stores</div>
+  <form id="auth-form" style="display:flex;flex-direction:column;gap:10px;width:260px">
+    <input id="auth-input" type="password" placeholder="Пароль" autocomplete="current-password"
+      style="background:#1a202c;border:1px solid #2d3748;color:#e2e8f0;padding:10px 14px;border-radius:9px;font-size:1rem;outline:none;text-align:center">
+    <button type="submit"
+      style="background:#4c51bf;border:none;color:#fff;padding:10px;border-radius:9px;font-size:.95rem;cursor:pointer;font-weight:600">Войти</button>
+    <div id="auth-error" style="display:none;color:#fc8181;font-size:.8rem;text-align:center">Неверный пароль</div>
+  </form>
+</div>
+</body>
+</html>

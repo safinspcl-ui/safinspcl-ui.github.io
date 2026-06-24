@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>База затрат и ФОТ</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:20px 24px}
+
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px}
+h1{font-size:1.35rem;font-weight:700;color:#fff}
+.status{display:flex;align-items:center;gap:8px;font-size:.8rem;color:#718096}
+.dot{width:8px;height:8px;border-radius:50%;background:#48bb78;animation:pulse 2s infinite}
+.dot.err{background:#fc8181;animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn{background:#2d3748;border:1px solid #4a5568;color:#e2e8f0;padding:7px 14px;border-radius:8px;font-size:.82rem;cursor:pointer;transition:background .15s}
+.btn:hover{background:#4a5568}
+.btn.active{background:#4c51bf;border-color:#667eea;color:#fff}
+.btn.primary{background:#4c51bf;border-color:#667eea;color:#fff}
+.btn.primary:hover{background:#5a5fd0}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px}
+
+.controls{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 20px;margin-bottom:20px}
+.ctrl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ctrl-row+.ctrl-row{margin-top:12px}
+.ctrl-label{font-size:.78rem;color:#718096;white-space:nowrap;min-width:90px}
+input[type=date],input[type=month],input[type=text],input[type=number],select{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:7px 10px;border-radius:8px;font-size:.84rem}
+input:focus,select:focus{outline:none;border-color:#667eea}
+input[type=text]{min-width:160px}
+.sep{width:1px;background:#2d3748;align-self:stretch;margin:0 4px}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:20px}
+.card{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 18px}
+.card-label{font-size:.72rem;color:#718096;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.card-value{font-size:1.4rem;font-weight:700;color:#76e4f7}
+.card-sub{font-size:.74rem;color:#718096;margin-top:3px}
+
+section{margin-bottom:24px}
+.section-title{font-size:.78rem;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+.hint{font-size:.78rem;color:#718096;margin-bottom:12px;line-height:1.5}
+code{background:#0f1117;border:1px solid #2d3748;border-radius:4px;padding:1px 5px;font-size:.82em;color:#cbd5e0}
+
+.form-wrap{background:#1a202c;border:1px solid #2d3748;border-radius:12px;padding:16px 20px;margin-bottom:20px}
+.form-row{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:.72rem;color:#718096;text-transform:uppercase;letter-spacing:.06em}
+
+.table-wrap{background:#1a202c;border:1px solid #2d3748;border-radius:12px;overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:.84rem}
+th{background:#2d3748;color:#a0aec0;font-weight:600;text-align:left;padding:10px 14px;font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
+td{padding:8px 14px;border-top:1px solid #2d3748;white-space:nowrap}
+tr:hover td{background:#2d3748}
+tr.total td{font-weight:700;border-top:2px solid #4a5568;color:#fff}
+.t-dim{color:#718096}
+.t-red{color:#fc8181}
+.scroll-x{overflow-x:auto;max-height:520px;overflow-y:auto}
+.del-btn{background:none;border:1px solid #4a5568;color:#fc8181;border-radius:6px;padding:2px 8px;font-size:.76rem;cursor:pointer}
+.del-btn:hover{background:#4a5568}
+.msg{font-size:.8rem;color:#a0aec0;margin-top:8px}
+.msg.ok{color:#68d391}
+.msg.err{color:#fc8181}
+footer{font-size:.74rem;color:#4a5568;text-align:center;margin-top:30px;padding-bottom:10px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>База затрат и ФОТ</h1>
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span id="lastUpdate">Загрузка…</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="btn active" id="tab-btn-costs"   onclick="switchTab('costs')">Затраты</button>
+  <button class="btn"        id="tab-btn-payroll" onclick="switchTab('payroll')">ФОТ</button>
+</div>
+
+<div class="hint" id="setupHint" style="display:none">
+  Не настроен адрес Apps Script. Откройте <code>costs-apps-script.gs</code>, разверните как веб-приложение
+  (см. инструкцию в начале файла) и впишите URL и токен в переменные <code>APPS_SCRIPT_URL</code> /
+  <code>APPS_SCRIPT_TOKEN</code> в начале <code>costs.html</code>.
+</div>
+
+<!-- ══════════════════ ЗАТРАТЫ ══════════════════ -->
+<div id="tab-costs">
+
+<div class="form-wrap">
+  <div class="section-title">Добавить затрату</div>
+  <div class="form-row">
+    <div class="field"><label>Дата</label><input type="date" id="c-date"></div>
+    <div class="field"><label>Направление</label>
+      <select id="c-direction" onchange="onDirectionChange('c')"></select>
+    </div>
+    <div class="field"><label>Поднаправление</label>
+      <select id="c-sub"></select>
+    </div>
+    <div class="field"><label>Статья затрат</label>
+      <input type="text" id="c-article" list="articleList" placeholder="напр. Печать картин">
+    </div>
+    <div class="field"><label>Описание</label>
+      <input type="text" id="c-desc" placeholder="напр. Zoom, ЗП 05-2026…">
+    </div>
+  </div>
+  <div class="form-row" style="margin-top:10px">
+    <div class="field"><label>Сумма $</label><input type="number" step="0.01" id="c-usd" style="width:110px"></div>
+    <div class="field"><label>Сумма грн</label><input type="number" step="0.01" id="c-uah" style="width:110px"></div>
+    <div class="field"><label>Курс</label><input type="number" step="0.01" id="c-rate" style="width:90px"></div>
+    <div class="field"><label>Счёт</label><input type="text" id="c-account" list="accountList" style="width:160px"></div>
+    <div class="field"><label>Примечание</label><input type="text" id="c-note" style="min-width:200px"></div>
+    <button class="btn primary" onclick="addCost()">Добавить</button>
+  </div>
+  <div class="msg" id="c-msg"></div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Период</span>
+    <input type="date" id="c-from">
+    <span class="t-dim">—</span>
+    <input type="date" id="c-to">
+    <div class="sep"></div>
+    <span class="ctrl-label" style="min-width:auto">Направление</span>
+    <select id="c-filter-dir" onchange="renderCosts()"><option value="">Все</option></select>
+    <span class="ctrl-label" style="min-width:auto">Поднаправление</span>
+    <select id="c-filter-sub" onchange="renderCosts()"><option value="">Все</option></select>
+  </div>
+</div>
+
+<div class="cards" id="c-cards"></div>
+
+<section>
+  <div class="section-title">Журнал затрат</div>
+  <div class="table-wrap scroll-x">
+    <table id="c-table"><thead></thead><tbody></tbody></table>
+  </div>
+</section>
+
+</div><!-- /tab-costs -->
+
+<!-- ══════════════════ ФОТ ══════════════════ -->
+<div id="tab-payroll" style="display:none">
+
+<div class="form-wrap">
+  <div class="section-title">Добавить ЗП</div>
+  <div class="form-row">
+    <div class="field"><label>Период</label><input type="month" id="p-period"></div>
+    <div class="field"><label>Сотрудник</label><input type="text" id="p-name" style="min-width:180px"></div>
+    <div class="field"><label>Направление</label>
+      <select id="p-direction" onchange="onDirectionChange('p')"></select>
+    </div>
+    <div class="field"><label>Поднаправление</label>
+      <select id="p-sub"></select>
+    </div>
+    <div class="field"><label>Сумма $</label><input type="number" step="0.01" id="p-usd" style="width:110px"></div>
+    <div class="field"><label>Примечание</label><input type="text" id="p-note" style="min-width:160px"></div>
+    <button class="btn primary" onclick="addPayroll()">Добавить</button>
+  </div>
+  <div class="msg" id="p-msg"></div>
+</div>
+
+<div class="controls">
+  <div class="ctrl-row">
+    <span class="ctrl-label">Период</span>
+    <input type="month" id="p-from">
+    <span class="t-dim">—</span>
+    <input type="month" id="p-to">
+    <div class="sep"></div>
+    <span class="ctrl-label" style="min-width:auto">Направление</span>
+    <select id="p-filter-dir" onchange="renderPayroll()"><option value="">Все</option></select>
+  </div>
+</div>
+
+<div class="cards" id="p-cards"></div>
+
+<section>
+  <div class="section-title">Журнал ЗП</div>
+  <div class="table-wrap scroll-x">
+    <table id="p-table"><thead></thead><tbody></tbody></table>
+  </div>
+</section>
+
+</div><!-- /tab-payroll -->
+
+<datalist id="articleList">
+  <option>ФОТ</option>
+  <option>IT поддержка</option>
+  <option>Подписки команды</option>
+  <option>Оплата дизайнерам</option>
+  <option>Оплата художникам</option>
+  <option>Печать картин</option>
+  <option>Упаковка</option>
+  <option>Оплата багетчику</option>
+  <option>Брокер</option>
+  <option>Пошлина США</option>
+  <option>Express доставка</option>
+  <option>Комиссия Вестернбид</option>
+  <option>Лоты</option>
+  <option>Etsy Payments</option>
+  <option>% Комиссии Etsy</option>
+  <option>Share & Save Etsy</option>
+  <option>Продвижение на Etsy</option>
+  <option>Потери</option>
+  <option>Рекламации Укрпочта</option>
+  <option>Курсовая разница</option>
+  <option>Справки экспресс</option>
+  <option>Расход Сергей</option>
+  <option>Расходы на содержание компании</option>
+  <option>Email маркетинг</option>
+  <option>Hosting</option>
+  <option>Работа над сайтом</option>
+  <option>Ads</option>
+  <option>CRM</option>
+  <option>Контент</option>
+  <option>Таргет</option>
+  <option>Рекрутинг</option>
+  <option>ПО Маркетинг</option>
+  <option>Подарки сотрудникам</option>
+  <option>Консалтинг</option>
+  <option>Payoneer</option>
+  <option>Прочее</option>
+</datalist>
+<datalist id="accountList">
+  <option>Карта</option>
+  <option>Etsy Portraithy</option>
+  <option>Etsy Sambanis</option>
+  <option>Payoneer</option>
+  <option>WesternBid</option>
+  <option>Наличные</option>
+  <option>Прочее</option>
+</datalist>
+
+<footer>База затрат и ФОТ — Google Sheets через Apps Script · обновляется при каждой загрузке страницы</footer>
+
+<script>
+/* ══════════════════════════════════════
+   КОНФИГ — заполнить после деплоя Apps Script
+   (см. инструкцию в costs-apps-script.gs)
+══════════════════════════════════════ */
+const APPS_SCRIPT_URL = ''; // напр. 'https://script.google.com/macros/s/AKfycb.../exec'
+const APPS_SCRIPT_TOKEN = ''; // тот же TOKEN, что и в Code.gs
+
+// Направления и поднаправления — единый справочник для затрат и ФОТ
+const DIRECTIONS = {
+  'Общий':  [],
+  'Etsy':   [],
+  'E-com':  ['Email', 'SEO', 'Meta Ads', 'Инфлюенсеры'],
+  'B2B':    [],
+};
+
+const MIN_DATE = '2026-01-01';
+
+let costsRows = [];
+let payrollRows = [];
+let activeTab = 'costs';
+
+/* ══════════════════════════════════════
+   ИНИЦИАЛИЗАЦИЯ
+══════════════════════════════════════ */
+function init() {
+  if (!APPS_SCRIPT_URL) document.getElementById('setupHint').style.display = 'block';
+
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('c-date').value = today;
+  document.getElementById('c-from').value = MIN_DATE;
+  document.getElementById('c-to').value = today;
+
+  const month = today.slice(0, 7);
+  document.getElementById('p-period').value = month;
+  document.getElementById('p-from').value = MIN_DATE.slice(0, 7);
+  document.getElementById('p-to').value = month;
+
+  fillDirectionSelects();
+  loadAll();
+}
+
+function fillDirectionSelects() {
+  const dirNames = Object.keys(DIRECTIONS);
+  const fillSelect = (id, withAll) => {
+    const sel = document.getElementById(id);
+    let html = withAll ? '<option value="">Все</option>' : '';
+    html += dirNames.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    sel.innerHTML = html;
+  };
+  fillSelect('c-direction', false);
+  fillSelect('c-filter-dir', true);
+  fillSelect('p-direction', false);
+  fillSelect('p-filter-dir', true);
+  onDirectionChange('c');
+  onDirectionChange('p');
+  fillSubFilter();
+}
+
+function fillSubFilter() {
+  // поднаправления для фильтра — объединение всех поднаправлений из справочника
+  const subs = new Set();
+  Object.values(DIRECTIONS).forEach(list => list.forEach(s => subs.add(s)));
+  const sel = document.getElementById('c-filter-sub');
+  sel.innerHTML = '<option value="">Все</option>' + [...subs].map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+}
+
+// обновляет список поднаправлений в зависимости от выбранного направления (для форм ввода)
+function onDirectionChange(prefix) {
+  const dir = document.getElementById(prefix + '-direction').value;
+  const subs = DIRECTIONS[dir] || [];
+  const sel = document.getElementById(prefix + '-sub');
+  if (!subs.length) {
+    sel.innerHTML = '<option value="">—</option>';
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+    sel.innerHTML = subs.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  }
+}
+
+/* ══════════════════════════════════════
+   ЗАГРУЗКА / ОТПРАВКА ДАННЫХ
+══════════════════════════════════════ */
+function loadAll() {
+  loadList('costs', rows => { costsRows = rows; renderCosts(); }, () => renderCosts());
+  loadList('payroll', rows => { payrollRows = rows; renderPayroll(); }, () => renderPayroll());
+}
+
+function loadList(sheet, onOk, onErr) {
+  if (!APPS_SCRIPT_URL) { onErr(); setStatus(false, 'Apps Script не настроен'); return; }
+  fetch(`${APPS_SCRIPT_URL}?action=list&sheet=${sheet}`)
+    .then(r => r.json())
+    .then(json => {
+      if (!json.ok) throw new Error(json.error || 'ошибка');
+      onOk(json.rows || []);
+      setStatus(true);
+    })
+    .catch(e => { onErr(); setStatus(false, e.message); });
+}
+
+function postAction(payload) {
+  return fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // без preflight
+    body: JSON.stringify(payload),
+  }).then(r => r.json());
+}
+
+function setStatus(ok, msg) {
+  document.getElementById('dot').className = 'dot' + (ok ? '' : ' err');
+  document.getElementById('lastUpdate').textContent = ok
+    ? 'Обновлено: ' + new Date().toLocaleTimeString('ru')
+    : 'Ошибка: ' + (msg || '');
+}
+
+/* ══════════════════════════════════════
+   ВКЛАДКИ
+══════════════════════════════════════ */
+function switchTab(name) {
+  activeTab = name;
+  ['costs', 'payroll'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
+    document.getElementById('tab-btn-' + t).classList.toggle('active', t === name);
+  });
+}
+
+/* ══════════════════════════════════════
+   ЗАТРАТЫ
+══════════════════════════════════════ */
+function addCost() {
+  const msg = document.getElementById('c-msg');
+  if (!APPS_SCRIPT_URL) { msg.className = 'msg err'; msg.textContent = 'Apps Script не настроен (см. подсказку наверху).'; return; }
+  const direction = document.getElementById('c-direction').value;
+  const sub = DIRECTIONS[direction].length ? document.getElementById('c-sub').value : '';
+  const usd = num(document.getElementById('c-usd').value);
+  const article = document.getElementById('c-article').value.trim();
+  if (!article || !usd) { msg.className = 'msg err'; msg.textContent = 'Укажите статью затрат и сумму в $.'; return; }
+
+  const row = {
+    'Дата': document.getElementById('c-date').value,
+    'Направление': direction,
+    'Поднаправление': sub,
+    'Статья затрат': article,
+    'Описание': document.getElementById('c-desc').value.trim(),
+    'Сумма $': usd,
+    'Сумма грн': num(document.getElementById('c-uah').value) || '',
+    'Курс': num(document.getElementById('c-rate').value) || '',
+    'Счёт': document.getElementById('c-account').value.trim(),
+    'Примечание': document.getElementById('c-note').value.trim(),
+  };
+
+  msg.className = 'msg'; msg.textContent = 'Сохранение…';
+  postAction({ action: 'add', sheet: 'costs', token: APPS_SCRIPT_TOKEN, row })
+    .then(json => {
+      if (!json.ok) throw new Error(json.error || 'ошибка');
+      msg.className = 'msg ok'; msg.textContent = 'Добавлено.';
+      ['c-article','c-desc','c-usd','c-uah','c-rate','c-account','c-note'].forEach(id => document.getElementById(id).value = '');
+      loadList('costs', rows => { costsRows = rows; renderCosts(); }, () => {});
+    })
+    .catch(e => { msg.className = 'msg err'; msg.textContent = 'Ошибка: ' + e.message; });
+}
+
+function deleteCost(rowNum) {
+  if (!confirm('Удалить запись?')) return;
+  postAction({ action: 'delete', sheet: 'costs', token: APPS_SCRIPT_TOKEN, row: rowNum })
+    .then(json => {
+      if (!json.ok) throw new Error(json.error || 'ошибка');
+      loadList('costs', rows => { costsRows = rows; renderCosts(); }, () => {});
+    })
+    .catch(e => alert('Ошибка: ' + e.message));
+}
+
+function filteredCosts() {
+  const from = document.getElementById('c-from').value;
+  const to = document.getElementById('c-to').value;
+  const dir = document.getElementById('c-filter-dir').value;
+  const sub = document.getElementById('c-filter-sub').value;
+  return costsRows.filter(r =>
+    (!from || r['Дата'] >= from) &&
+    (!to || r['Дата'] <= to) &&
+    (!dir || r['Направление'] === dir) &&
+    (!sub || r['Поднаправление'] === sub)
+  );
+}
+
+function renderCosts() {
+  const rows = filteredCosts();
+
+  // карточки: сумма по направлениям
+  const byDir = new Map();
+  let total = 0;
+  for (const r of rows) {
+    const v = num(r['Сумма $']);
+    total += v;
+    byDir.set(r['Направление'], (byDir.get(r['Направление']) || 0) + v);
+  }
+  const cards = document.getElementById('c-cards');
+  let html = `<div class="card"><div class="card-label">Всего затрат</div><div class="card-value">${fmt(total)}</div><div class="card-sub">${rows.length} записей</div></div>`;
+  for (const [dir, sum] of [...byDir.entries()].sort((a,b) => b[1]-a[1])) {
+    html += `<div class="card"><div class="card-label">${esc(dir)}</div><div class="card-value">${fmt(sum)}</div></div>`;
+  }
+  cards.innerHTML = html;
+
+  // таблица
+  const table = document.getElementById('c-table');
+  table.querySelector('thead').innerHTML = `<tr>
+    <th>Дата</th><th>Направление</th><th>Поднаправление</th><th>Статья</th><th>Описание</th>
+    <th class="num">Сумма $</th><th class="num">Сумма грн</th><th class="num">Курс</th><th>Счёт</th><th>Примечание</th><th></th>
+  </tr>`;
+  const sorted = [...rows].sort((a,b) => (b['Дата']||'').localeCompare(a['Дата']||''));
+  table.querySelector('tbody').innerHTML = sorted.map(r => `<tr>
+    <td>${esc(r['Дата'])}</td>
+    <td>${esc(r['Направление'])}</td>
+    <td class="t-dim">${esc(r['Поднаправление'] || '—')}</td>
+    <td>${esc(r['Статья затрат'])}</td>
+    <td class="t-dim">${esc(r['Описание'])}</td>
+    <td class="num">${fmt(num(r['Сумма $']))}</td>
+    <td class="num t-dim">${r['Сумма грн'] ? fmt(num(r['Сумма грн'])) : ''}</td>
+    <td class="num t-dim">${r['Курс'] || ''}</td>
+    <td class="t-dim">${esc(r['Счёт'])}</td>
+    <td class="t-dim">${esc(r['Примечание'])}</td>
+    <td><button class="del-btn" onclick="deleteCost(${r._row})">×</button></td>
+  </tr>`).join('') || '<tr><td colspan="11" class="t-dim">Нет данных за выбранный период</td></tr>';
+}
+
+/* ══════════════════════════════════════
+   ФОТ
+══════════════════════════════════════ */
+function addPayroll() {
+  const msg = document.getElementById('p-msg');
+  if (!APPS_SCRIPT_URL) { msg.className = 'msg err'; msg.textContent = 'Apps Script не настроен (см. подсказку наверху).'; return; }
+  const direction = document.getElementById('p-direction').value;
+  const sub = DIRECTIONS[direction].length ? document.getElementById('p-sub').value : '';
+  const name = document.getElementById('p-name').value.trim();
+  const usd = num(document.getElementById('p-usd').value);
+  if (!name || !usd) { msg.className = 'msg err'; msg.textContent = 'Укажите сотрудника и сумму в $.'; return; }
+
+  const row = {
+    'Период': document.getElementById('p-period').value,
+    'Сотрудник': name,
+    'Направление': direction,
+    'Поднаправление': sub,
+    'Сумма $': usd,
+    'Примечание': document.getElementById('p-note').value.trim(),
+  };
+
+  msg.className = 'msg'; msg.textContent = 'Сохранение…';
+  postAction({ action: 'add', sheet: 'payroll', token: APPS_SCRIPT_TOKEN, row })
+    .then(json => {
+      if (!json.ok) throw new Error(json.error || 'ошибка');
+      msg.className = 'msg ok'; msg.textContent = 'Добавлено.';
+      ['p-name','p-usd','p-note'].forEach(id => document.getElementById(id).value = '');
+      loadList('payroll', rows => { payrollRows = rows; renderPayroll(); }, () => {});
+    })
+    .catch(e => { msg.className = 'msg err'; msg.textContent = 'Ошибка: ' + e.message; });
+}
+
+function deletePayroll(rowNum) {
+  if (!confirm('Удалить запись?')) return;
+  postAction({ action: 'delete', sheet: 'payroll', token: APPS_SCRIPT_TOKEN, row: rowNum })
+    .then(json => {
+      if (!json.ok) throw new Error(json.error || 'ошибка');
+      loadList('payroll', rows => { payrollRows = rows; renderPayroll(); }, () => {});
+    })
+    .catch(e => alert('Ошибка: ' + e.message));
+}
+
+function filteredPayroll() {
+  const from = document.getElementById('p-from').value;
+  const to = document.getElementById('p-to').value;
+  const dir = document.getElementById('p-filter-dir').value;
+  return payrollRows.filter(r =>
+    (!from || r['Период'] >= from) &&
+    (!to || r['Период'] <= to) &&
+    (!dir || r['Направление'] === dir)
+  );
+}
+
+function renderPayroll() {
+  const rows = filteredPayroll();
+
+  // карточки: сумма по направлениям (+ поднаправления для E-com)
+  const byKey = new Map();
+  let total = 0;
+  for (const r of rows) {
+    const v = num(r['Сумма $']);
+    total += v;
+    const key = r['Поднаправление'] ? `${r['Направление']} · ${r['Поднаправление']}` : r['Направление'];
+    byKey.set(key, (byKey.get(key) || 0) + v);
+  }
+  const cards = document.getElementById('p-cards');
+  let html = `<div class="card"><div class="card-label">Всего ФОТ</div><div class="card-value">${fmt(total)}</div><div class="card-sub">${rows.length} записей</div></div>`;
+  for (const [key, sum] of [...byKey.entries()].sort((a,b) => b[1]-a[1])) {
+    html += `<div class="card"><div class="card-label">${esc(key)}</div><div class="card-value">${fmt(sum)}</div></div>`;
+  }
+  cards.innerHTML = html;
+
+  // таблица
+  const table = document.getElementById('p-table');
+  table.querySelector('thead').innerHTML = `<tr>
+    <th>Период</th><th>Сотрудник</th><th>Направление</th><th>Поднаправление</th><th class="num">Сумма $</th><th>Примечание</th><th></th>
+  </tr>`;
+  const sorted = [...rows].sort((a,b) => (b['Период']||'').localeCompare(a['Период']||''));
+  table.querySelector('tbody').innerHTML = sorted.map(r => `<tr>
+    <td>${esc(r['Период'])}</td>
+    <td>${esc(r['Сотрудник'])}</td>
+    <td>${esc(r['Направление'])}</td>
+    <td class="t-dim">${esc(r['Поднаправление'] || '—')}</td>
+    <td class="num">${fmt(num(r['Сумма $']))}</td>
+    <td class="t-dim">${esc(r['Примечание'])}</td>
+    <td><button class="del-btn" onclick="deletePayroll(${r._row})">×</button></td>
+  </tr>`).join('') || '<tr><td colspan="7" class="t-dim">Нет данных за выбранный период</td></tr>';
+}
+
+/* ══════════════════════════════════════
+   УТИЛИТЫ
+══════════════════════════════════════ */
+function num(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return v;
+  return +String(v).replace(/\s/g,'').replace(',', '.') || 0;
+}
+function fmt(v) {
+  return v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+init();
+</script>
+</body>
+</html>
