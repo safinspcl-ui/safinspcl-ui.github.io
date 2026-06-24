@@ -240,21 +240,35 @@ const DEFAULT_DATA = {
 let state = DEFAULT_DATA;
 let dirty = false;
 let saveTimer = null;
+let loaded = false; // true только после успешной загрузки с сервера — защита от перезатирания чужих данных стартовым набором
 
 /* ══════════════════════════════════════
    ИНИЦИАЛИЗАЦИЯ / ЗАГРУЗКА / СОХРАНЕНИЕ
 ══════════════════════════════════════ */
 function init() {
-  if (!APPS_SCRIPT_URL) { document.getElementById('setupHint').style.display = 'block'; renderAll(); return; }
+  if (!APPS_SCRIPT_URL) { document.getElementById('setupHint').style.display = 'block'; loaded = true; renderAll(); return; }
+  loadFromServer(true);
+}
+
+function loadFromServer(isInitial) {
+  setStatus('dirty', 'Загрузка…');
   fetch(`${APPS_SCRIPT_URL}?action=load`)
-    .then(r => r.json())
-    .then(res => {
+    .then(r => r.text())
+    .then(text => {
+      let res;
+      try { res = JSON.parse(text); }
+      catch (e) { throw new Error('сервер вернул не JSON (возможно, временный сбой Apps Script) — попробуйте «Повторить загрузку»'); }
       if (!res.ok) throw new Error(res.error || 'ошибка загрузки');
       if (res.data) state = normalizeState(res.data);
+      loaded = true;
       setStatus('ok', res.updatedAt ? 'Загружено: ' + fmtDate(res.updatedAt) : 'Загружено');
       renderAll();
     })
-    .catch(e => { setStatus('err', e.message); renderAll(); });
+    .catch(e => {
+      loaded = false;
+      setStatus('err', e.message + ' — редактирование и сохранение заблокированы до успешной загрузки', true);
+      if (isInitial) renderAll();
+    });
 }
 
 function normalizeState(data) {
@@ -289,13 +303,20 @@ function markDirty() {
 function saveNow() {
   if (!APPS_SCRIPT_URL) { setStatus('err', 'Apps Script не настроен'); return; }
   clearTimeout(saveTimer);
+  if (!loaded) {
+    setStatus('err', 'Сохранение заблокировано: данные с сервера ещё не загружены успешно', true);
+    return;
+  }
   setStatus('dirty', 'Сохранение…');
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action: 'save', token: APPS_SCRIPT_TOKEN, data: state }),
-  }).then(r => r.json())
-    .then(res => {
+  }).then(r => r.text())
+    .then(text => {
+      let res;
+      try { res = JSON.parse(text); }
+      catch (e) { throw new Error('сервер вернул не JSON (возможно, временный сбой Apps Script) — изменения НЕ сохранены, попробуйте ещё раз'); }
       if (!res.ok) throw new Error(res.error || 'ошибка сохранения');
       dirty = false;
       setStatus('ok', 'Сохранено: ' + fmtDate(res.updatedAt));
@@ -303,10 +324,19 @@ function saveNow() {
     .catch(e => setStatus('err', 'Ошибка сохранения: ' + e.message));
 }
 
-function setStatus(kind, msg) {
+function setStatus(kind, msg, withRetry) {
   const dot = document.getElementById('dot');
   dot.className = 'dot' + (kind === 'ok' ? '' : kind === 'dirty' ? ' dirty' : ' err');
-  document.getElementById('lastUpdate').textContent = msg;
+  const el = document.getElementById('lastUpdate');
+  el.textContent = msg;
+  if (withRetry) {
+    const btn = document.createElement('button');
+    btn.className = 'btn sm';
+    btn.style.marginLeft = '8px';
+    btn.textContent = 'Повторить загрузку';
+    btn.onclick = () => loadFromServer(true);
+    el.appendChild(btn);
+  }
 }
 
 function fmtDate(d) {
