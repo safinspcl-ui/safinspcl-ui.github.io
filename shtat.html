@@ -95,6 +95,14 @@ select{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:5px 6px
 .cell-pair{display:flex;gap:3px;align-items:center}
 .cell-pair span{color:#4a5568;font-size:.72rem}
 .amt{font-size:.7rem;color:#76e4f7;display:block;text-align:right;margin-top:1px}
+.dir-grp-0{background:#1b2230}
+.dir-grp-1{background:#1f1b2e}
+.dir-grp-2{background:#1b2a26}
+.dir-grp-3{background:#2a2419}
+tr:hover .dir-grp{filter:brightness(1.15)}
+.dir-first{border-left:2px solid #4a5568}
+.sum-ok{color:#68d391;font-weight:700}
+.sum-bad{color:#fc8181;font-weight:700}
 .commission-row{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
 .commission-row label{display:flex;align-items:center;gap:4px;font-size:.74rem;color:#a0aec0;cursor:pointer}
 .del-btn{background:none;border:1px solid #4a5568;color:#fc8181;border-radius:6px;padding:2px 8px;font-size:.78rem;cursor:pointer}
@@ -483,10 +491,10 @@ function renderDepartments() {
 }
 
 function renderDept(dep) {
-  const dirHeaders = state.directions.map(d => `<th class="num" colspan="2">${esc(d)}</th>`).join('');
-  const dirSubHeaders = state.directions.map(() => `<th class="num">Окл %</th><th class="num">Бон %</th>`).join('');
+  const dirHeaders = state.directions.map((d, i) => `<th class="num dir-grp dir-grp-${i % 4} dir-first" colspan="2">${esc(d)}</th>`).join('');
+  const dirSubHeaders = state.directions.map((d, i) => `<th class="num dir-grp dir-grp-${i % 4} dir-first">Окл %</th><th class="num dir-grp dir-grp-${i % 4}">Бон %</th>`).join('');
   const rows = dep.employees.map(e => renderEmpRow(dep.id, e)).join('') ||
-    `<tr><td colspan="${7 + state.directions.length * 2}" class="t-dim">Нет сотрудников в отделе</td></tr>`;
+    `<tr><td colspan="${9 + state.directions.length * 2}" class="t-dim">Нет сотрудников в отделе</td></tr>`;
 
   return `
   <div class="dept" data-dept="${dep.id}">
@@ -504,6 +512,7 @@ function renderDept(dep) {
             <th rowspan="2" class="num">Оклад</th><th rowspan="2" class="num">Бонус</th>
             <th rowspan="2">% от заказа</th>
             ${dirHeaders}
+            <th rowspan="2" class="num">Σ Окл %</th><th rowspan="2" class="num">Σ Бон %</th>
             <th rowspan="2" class="num">Итого ЗП</th><th rowspan="2"></th>
           </tr>
           <tr>${dirSubHeaders}</tr>
@@ -515,15 +524,15 @@ function renderDept(dep) {
 }
 
 function renderEmpRow(deptId, e) {
-  const dirCells = state.directions.map(d => {
+  const dirCells = state.directions.map((d, i) => {
     const a = e.alloc[d] || { oklad: 0, bonus: 0 };
     return `
-      <td class="num">
+      <td class="num dir-grp dir-grp-${i % 4} dir-first">
         <input type="number" class="w-pct" value="${a.oklad || 0}" min="0" max="100"
           oninput="setAlloc('${deptId}','${e.id}','${esc(d)}','oklad', this.value)">
         <span class="amt" id="amt-${e.id}-${dirKey(d)}-oklad"></span>
       </td>
-      <td class="num">
+      <td class="num dir-grp dir-grp-${i % 4}">
         <input type="number" class="w-pct" value="${a.bonus || 0}" min="0" max="100"
           oninput="setAlloc('${deptId}','${e.id}','${esc(d)}','bonus', this.value)">
         <span class="amt" id="amt-${e.id}-${dirKey(d)}-bonus"></span>
@@ -551,6 +560,8 @@ function renderEmpRow(deptId, e) {
       </div>
     </td>
     ${dirCells}
+    <td class="num"><span id="sum-emp-${e.id}-oklad"></span></td>
+    <td class="num"><span id="sum-emp-${e.id}-bonus"></span></td>
     <td class="num"><span id="tot-emp-${e.id}"></span></td>
     <td><button class="del-btn" onclick="deleteEmployee('${deptId}','${e.id}')">×</button></td>
   </tr>`;
@@ -573,6 +584,12 @@ function recalcAll() {
         if (okEl) okEl.textContent = '$' + fmt(e.oklad * (a.oklad || 0) / 100);
         if (bnEl) bnEl.textContent = '$' + fmt(e.bonus * (a.bonus || 0) / 100);
       });
+      const okladSum = allocSum(e, 'oklad');
+      const bonusSum = allocSum(e, 'bonus');
+      const sumOkEl = document.getElementById(`sum-emp-${e.id}-oklad`);
+      const sumBnEl = document.getElementById(`sum-emp-${e.id}-bonus`);
+      if (sumOkEl) { sumOkEl.textContent = okladSum + '%'; sumOkEl.className = okladSum === 100 ? 'sum-ok' : 'sum-bad'; }
+      if (sumBnEl) { sumBnEl.textContent = bonusSum + '%'; sumBnEl.className = bonusSum === 100 ? 'sum-ok' : 'sum-bad'; }
     });
     const dt = deptTotals(dep);
     const statsEl = document.getElementById(`dept-stats-${dep.id}`);
