@@ -329,7 +329,7 @@ function addDirection() {
 
 function renameDirection(oldName, newName) {
   newName = newName.trim();
-  if (!newName || newName === oldName) { renderAll(); return; }
+  if (!newName || newName === oldName) { return; }
   if (state.directions.includes(newName)) { alert('Такое направление уже есть'); renderAll(); return; }
   state.directions = state.directions.map(d => d === oldName ? newName : d);
   state.departments.forEach(dep => dep.employees.forEach(e => {
@@ -476,8 +476,8 @@ function renderDirChips() {
   const wrap = document.getElementById('dirChips');
   wrap.innerHTML = state.directions.map(d => `
     <div class="chip">
-      <input type="text" value="${esc(d)}" onblur="renameDirection(${JSON.stringify(d)}, this.value)" onkeydown="if(event.key==='Enter')this.blur()">
-      <button class="x" title="Удалить направление" onclick="deleteDirection(${JSON.stringify(d)})">×</button>
+      <input type="text" value="${esc(d)}" onblur="renameDirection(${esc(JSON.stringify(d))}, this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <button class="x" title="Удалить направление" onclick="deleteDirection(${esc(JSON.stringify(d))})">×</button>
     </div>`).join('') || '<span class="t-dim">Нет направлений</span>';
 }
 
