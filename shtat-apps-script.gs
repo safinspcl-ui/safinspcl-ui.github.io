@@ -12,19 +12,21 @@
    1. Откройте таблицу https://docs.google.com/spreadsheets/d/1LCJeCeJLQ05sPWLz_7MoO5Wab4nRJhO4PlXrxy1fQ7U
    2. Расширения → Apps Script
    3. Создайте новый файл (или используйте Code.gs), вставьте этот файл целиком
-   4. Замените TOKEN ниже на свой произвольный секрет
+   4. Замените TOKEN ниже НА ТОТ ЖЕ ПАРОЛЬ, что стоит на странице shtat.html (переменная PWD
+      в самом начале <head> shtat.html). Токена-константы в shtat.html больше нет —
+      на запись отправляется пароль, который ввёл пользователь при входе. Если потребуется
+      сменить пароль — меняйте его в ДВУХ местах: PWD в shtat.html и TOKEN здесь.
    5. Деплой → Новый деплой → тип "Веб-приложение"
         - Выполнять от имени: Я (ваш аккаунт)
         - У кого есть доступ: Все (Anyone)
-   6. Скопируйте URL веб-приложения и вставьте в shtat.html (APPS_SCRIPT_URL),
-      туда же впишите тот же TOKEN (APPS_SCRIPT_TOKEN)
+   6. Скопируйте URL веб-приложения и вставьте в shtat.html (APPS_SCRIPT_URL)
    7. При обновлении кода — Деплой → Управление деплоями → Изменить → Новая версия
 ══════════════════════════════════════════════════════════════ */
 
 const SHEET_ID = '1LCJeCeJLQ05sPWLz_7MoO5Wab4nRJhO4PlXrxy1fQ7U';
 const DATA_SHEET = 'Штат_данные';
 const HISTORY_SHEET = 'Штат_история';
-const TOKEN = 'CHANGE_ME_SECRET'; // <-- поменяйте перед деплоем
+const TOKEN = 'CHANGE_ME_SECRET'; // <-- поменяйте на пароль страницы (PWD из shtat.html) перед деплоем
 const MAX_HISTORY = 30;
 
 function doGet(e)  { return handle(e); }

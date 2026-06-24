@@ -15,6 +15,7 @@
         e.preventDefault();
         if(document.getElementById('auth-input').value===PWD){
           sessionStorage.setItem(KEY,'1');
+          sessionStorage.setItem('site_pwd', PWD); // используется как токен записи для Apps Script (см. getWriteToken() ниже)
           overlay.style.display='none';
         } else {
           document.getElementById('auth-error').style.display='block';
@@ -130,8 +131,8 @@ footer{font-size:.74rem;color:#4a5568;text-align:center;margin-top:30px;padding-
 
 <div class="hint" id="setupHint" style="display:none">
   Не настроен адрес Apps Script. Откройте <code>shtat-apps-script.gs</code>, разверните как веб-приложение
-  (см. инструкцию в начале файла) и впишите URL и токен в переменные <code>APPS_SCRIPT_URL</code> /
-  <code>APPS_SCRIPT_TOKEN</code> в начале <code>shtat.html</code>.
+  (см. инструкцию в начале файла), впишите URL в переменную <code>APPS_SCRIPT_URL</code> в начале <code>shtat.html</code>,
+  а в самом Apps Script (Code.gs) выставьте <code>TOKEN</code> равным паролю страницы (см. <code>PWD</code> в начале <code>shtat.html</code>).
 </div>
 
 <section>
@@ -176,7 +177,9 @@ footer{font-size:.74rem;color:#4a5568;text-align:center;margin-top:30px;padding-
    (см. инструкцию в shtat-apps-script.gs)
 ══════════════════════════════════════ */
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzy9D60V-7QTpwJ_1MxGPq3yAWinCTTKVFIOPmQ_9nFrO9AnlzxJA2vZ1QkR4Ic1AEd4w/exec';
-const APPS_SCRIPT_TOKEN = 'bb3a1b479f36dfb0564cc60b777145ce';
+// токена-константы больше нет: на запись используется пароль страницы, введённый при входе (см. <head>).
+// На стороне Apps Script (Code.gs) TOKEN должен быть выставлен в то же значение, что и пароль страницы.
+function getWriteToken() { return sessionStorage.getItem('site_pwd') || ''; }
 
 let uidCounter = 1;
 function uid() { return 'id' + (uidCounter++) + '_' + Math.random().toString(36).slice(2, 7); }
@@ -311,7 +314,7 @@ function saveNow() {
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'save', token: APPS_SCRIPT_TOKEN, data: state }),
+    body: JSON.stringify({ action: 'save', token: getWriteToken(), data: state }),
   }).then(r => r.text())
     .then(text => {
       let res;
