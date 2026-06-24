@@ -90,7 +90,7 @@ input:focus,select:focus{outline:none;border-color:#667eea}
 .w-pos{width:140px}
 .w-sm{width:55px}
 .w-md{width:75px}
-.w-pct{width:46px;text-align:right}
+.w-pct{width:54px;text-align:right}
 select{background:#0f1117;border:1px solid #2d3748;color:#e2e8f0;padding:5px 6px;border-radius:6px;font-size:.78rem}
 .cell-pair{display:flex;gap:3px;align-items:center}
 .cell-pair span{color:#4a5568;font-size:.72rem}
@@ -190,7 +190,8 @@ function emp(name, position, fte, oklad, bonus, okladRatio, bonusRatio, commissi
     B2B: { oklad: 0, bonus: 0 },
   };
   return { id: uid(), name, position, fte, oklad, bonus,
-    commission: commission ? { enabled: true, type: 'amount', value: commission } : { enabled: false, type: 'amount', value: 0 },
+    // commission — информационный % от заказа, не входит в расчёт ЗП (считается по факту продаж)
+    commission: { enabled: !!commission, value: 0 },
     alloc };
 }
 
@@ -270,7 +271,6 @@ function normalizeState(data) {
       bonus: numv(e.bonus, 0),
       commission: {
         enabled: !!(e.commission && e.commission.enabled),
-        type: (e.commission && e.commission.type) || 'amount',
         value: numv(e.commission && e.commission.value, 0),
       },
       alloc: e.alloc || {},
@@ -378,7 +378,7 @@ function addEmployee(deptId) {
   state.directions.forEach(d => alloc[d] = { oklad: 0, bonus: 0 });
   dep.employees.push({
     id: uid(), name: '', position: '', fte: 1, oklad: 0, bonus: 0,
-    commission: { enabled: false, type: 'amount', value: 0 },
+    commission: { enabled: false, value: 0 },
     alloc,
   });
   markDirty();
@@ -412,10 +412,9 @@ function setCommission(deptId, empId, field, value) {
   const e = findEmployee(deptId, empId);
   if (!e) return;
   if (field === 'enabled') e.commission.enabled = !!value;
-  else if (field === 'value') e.commission.value = numv(value, 0);
-  else e.commission.type = value;
+  else e.commission.value = numv(value, 0);
   markDirty();
-  if (field === 'enabled' || field === 'type') { renderAll(); } else { recalcAll(); }
+  if (field === 'enabled') { renderAll(); } else { recalcAll(); }
 }
 
 function setAlloc(deptId, empId, dir, kind, value) {
@@ -431,9 +430,7 @@ function setAlloc(deptId, empId, dir, kind, value) {
    РАСЧЁТЫ
 ══════════════════════════════════════ */
 function empTotal(e) {
-  let total = e.oklad + e.bonus;
-  if (e.commission.enabled && e.commission.type === 'amount') total += e.commission.value;
-  return total;
+  return e.oklad + e.bonus;
 }
 
 function allocSum(e, kind) {
@@ -441,11 +438,10 @@ function allocSum(e, kind) {
 }
 
 function deptTotals(dep) {
-  const t = { fte: 0, oklad: 0, bonus: 0, commission: 0, total: 0, byDir: {} };
+  const t = { fte: 0, oklad: 0, bonus: 0, total: 0, byDir: {} };
   state.directions.forEach(d => t.byDir[d] = { oklad: 0, bonus: 0 });
   dep.employees.forEach(e => {
     t.fte += e.fte; t.oklad += e.oklad; t.bonus += e.bonus;
-    if (e.commission.enabled && e.commission.type === 'amount') t.commission += e.commission.value;
     t.total += empTotal(e);
     state.directions.forEach(d => {
       const a = e.alloc[d] || { oklad: 0, bonus: 0 };
@@ -457,11 +453,11 @@ function deptTotals(dep) {
 }
 
 function companyTotals() {
-  const t = { fte: 0, oklad: 0, bonus: 0, commission: 0, total: 0, byDir: {} };
+  const t = { fte: 0, oklad: 0, bonus: 0, total: 0, byDir: {} };
   state.directions.forEach(d => t.byDir[d] = { oklad: 0, bonus: 0 });
   state.departments.forEach(dep => {
     const dt = deptTotals(dep);
-    t.fte += dt.fte; t.oklad += dt.oklad; t.bonus += dt.bonus; t.commission += dt.commission; t.total += dt.total;
+    t.fte += dt.fte; t.oklad += dt.oklad; t.bonus += dt.bonus; t.total += dt.total;
     state.directions.forEach(d => { t.byDir[d].oklad += dt.byDir[d].oklad; t.byDir[d].bonus += dt.byDir[d].bonus; });
   });
   return t;
@@ -551,11 +547,7 @@ function renderEmpRow(deptId, e) {
         <label><input type="checkbox" ${e.commission.enabled ? 'checked' : ''} onchange="setCommission('${deptId}','${e.id}','enabled', this.checked)"> получает % от заказа</label>
         ${e.commission.enabled ? `
         <div class="cell-pair">
-          <select onchange="setCommission('${deptId}','${e.id}','type', this.value)">
-            <option value="amount" ${e.commission.type === 'amount' ? 'selected' : ''}>Сумма $</option>
-            <option value="percent" ${e.commission.type === 'percent' ? 'selected' : ''}>% от заказа</option>
-          </select>
-          <input type="number" class="w-md" value="${e.commission.value}" oninput="setCommission('${deptId}','${e.id}','value', this.value)">
+          <input type="number" class="w-sm" value="${e.commission.value}" oninput="setCommission('${deptId}','${e.id}','value', this.value)"><span>%</span>
         </div>` : ''}
       </div>
     </td>
@@ -610,7 +602,6 @@ function renderCompanyCards() {
     <div class="card"><div class="card-label">Ставки</div><div class="card-value">${fmt(t.fte)}</div></div>
     <div class="card"><div class="card-label">Оклад</div><div class="card-value">$${fmt(t.oklad)}</div></div>
     <div class="card"><div class="card-label">Бонус</div><div class="card-value">$${fmt(t.bonus)}</div></div>
-    <div class="card"><div class="card-label">Комиссии (фикс. $)</div><div class="card-value">$${fmt(t.commission)}</div></div>
     <div class="card"><div class="card-label">Итого ФОТ</div><div class="card-value">$${fmt(t.total)}</div></div>`;
   cards.innerHTML = html;
 }
@@ -620,19 +611,19 @@ function renderDeptTotalsTable() {
   const dirHeaders = state.directions.map(d => `<th class="num">${esc(d)} Оклад</th><th class="num">${esc(d)} Бонус</th>`).join('');
   table.querySelector('thead').innerHTML = `<tr>
     <th>Отдел</th><th class="num">Ставки</th><th class="num">Оклад</th><th class="num">Бонус</th>
-    <th class="num">Комиссии</th>${dirHeaders}<th class="num">Итого ЗП</th></tr>`;
+    ${dirHeaders}<th class="num">Итого ЗП</th></tr>`;
 
   const rows = state.departments.map(dep => {
     const t = deptTotals(dep);
     const dirCells = state.directions.map(d => `<td class="num">$${fmt(t.byDir[d].oklad)}</td><td class="num">$${fmt(t.byDir[d].bonus)}</td>`).join('');
     return `<tr><td>${esc(dep.name)}</td><td class="num">${fmt(t.fte)}</td><td class="num">$${fmt(t.oklad)}</td>
-      <td class="num">$${fmt(t.bonus)}</td><td class="num">$${fmt(t.commission)}</td>${dirCells}<td class="num">$${fmt(t.total)}</td></tr>`;
+      <td class="num">$${fmt(t.bonus)}</td>${dirCells}<td class="num">$${fmt(t.total)}</td></tr>`;
   }).join('');
 
   const c = companyTotals();
   const dirTotalCells = state.directions.map(d => `<td class="num">$${fmt(c.byDir[d].oklad)}</td><td class="num">$${fmt(c.byDir[d].bonus)}</td>`).join('');
   const totalRow = `<tr class="total"><td>Компания, итого</td><td class="num">${fmt(c.fte)}</td><td class="num">$${fmt(c.oklad)}</td>
-    <td class="num">$${fmt(c.bonus)}</td><td class="num">$${fmt(c.commission)}</td>${dirTotalCells}<td class="num">$${fmt(c.total)}</td></tr>`;
+    <td class="num">$${fmt(c.bonus)}</td>${dirTotalCells}<td class="num">$${fmt(c.total)}</td></tr>`;
 
   table.querySelector('tbody').innerHTML = rows + totalRow || '<tr><td class="t-dim">Нет данных</td></tr>';
 }
