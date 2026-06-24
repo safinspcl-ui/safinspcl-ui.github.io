@@ -7,7 +7,7 @@
 <script>
 (function(){
   const KEY='site_auth', PWD='Portrait';
-  if(sessionStorage.getItem(KEY)!=='1'){
+  if(sessionStorage.getItem(KEY)!=='1' || !sessionStorage.getItem('site_pwd')){
     document.addEventListener('DOMContentLoaded',function(){
       const overlay=document.getElementById('auth-overlay');
       overlay.style.display='flex';
