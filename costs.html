@@ -4,6 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>База затрат и ФОТ</title>
+<script>
+(function(){
+  const KEY='site_auth', PWD='Portrait';
+  if(sessionStorage.getItem(KEY)!=='1'){
+    document.addEventListener('DOMContentLoaded',function(){
+      const overlay=document.getElementById('auth-overlay');
+      overlay.style.display='flex';
+      document.getElementById('auth-form').onsubmit=function(e){
+        e.preventDefault();
+        if(document.getElementById('auth-input').value===PWD){
+          sessionStorage.setItem(KEY,'1');
+          overlay.style.display='none';
+        } else {
+          document.getElementById('auth-error').style.display='block';
+          document.getElementById('auth-input').value='';
+        }
+      };
+    });
+  }
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:20px 24px}
@@ -569,5 +590,15 @@ function esc(s) {
 
 init();
 </script>
+<div id="auth-overlay" style="display:none;position:fixed;inset:0;background:#0f1117;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+  <div style="font-size:1.1rem;font-weight:700;color:#fff">База затрат и ФОТ</div>
+  <form id="auth-form" style="display:flex;flex-direction:column;gap:10px;width:260px">
+    <input id="auth-input" type="password" placeholder="Пароль" autocomplete="current-password"
+      style="background:#1a202c;border:1px solid #2d3748;color:#e2e8f0;padding:10px 14px;border-radius:9px;font-size:1rem;outline:none;text-align:center">
+    <button type="submit"
+      style="background:#4c51bf;border:none;color:#fff;padding:10px;border-radius:9px;font-size:.95rem;cursor:pointer;font-weight:600">Войти</button>
+    <div id="auth-error" style="display:none;color:#fc8181;font-size:.8rem;text-align:center">Неверный пароль</div>
+  </form>
+</div>
 </body>
 </html>
